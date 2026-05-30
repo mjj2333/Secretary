@@ -15,8 +15,12 @@ export interface ServerDeps {
   origin: string;
 }
 
-/** Routes that do not require a session token. */
-const PUBLIC_PATHS = new Set(['/api/v1/health', '/api/v1/auth/session']);
+/**
+ * Method+path pairs reachable without a session token: health, and the bootstrap
+ * exchange (chicken-and-egg — you have no session yet). Everything else, including
+ * DELETE /auth/session (revoke), requires a valid bearer token.
+ */
+const PUBLIC_ROUTES = new Set(['GET /api/v1/health', 'POST /api/v1/auth/session']);
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -26,7 +30,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // Auth guard: every route except PUBLIC_PATHS requires a valid bearer session token.
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0] ?? req.url;
-    if (PUBLIC_PATHS.has(path)) return;
+    if (PUBLIC_ROUTES.has(`${req.method} ${path}`)) return;
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     if (!token || !deps.sessions.validateSession(token)) {

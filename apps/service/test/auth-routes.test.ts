@@ -36,7 +36,12 @@ describe('auth routes', () => {
     });
     const token = ex.json().data.token as string;
 
-    const del = await app.inject({ method: 'DELETE', url: '/api/v1/auth/session' });
+    // Revoke requires auth (it is NOT a public route); present the session token.
+    const del = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/auth/session',
+      headers: { authorization: `Bearer ${token}` },
+    });
     expect(del.statusCode).toBe(200);
     expect(del.json().data.revoked).toBe(true);
 
@@ -47,6 +52,14 @@ describe('auth routes', () => {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(after.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('rejects an unauthenticated DELETE /auth/session', async () => {
+    const { app } = await makeTestServer();
+    const res = await app.inject({ method: 'DELETE', url: '/api/v1/auth/session' });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error.code).toBe('unauthorized');
     await app.close();
   });
 });
