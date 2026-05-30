@@ -6,6 +6,7 @@ import type { SessionTokens } from './crypto/SessionTokens.js';
 import type { EventBus } from './eventBus.js';
 import { registerHealthRoutes } from './api/health.js';
 import { registerAuthRoutes } from './api/auth.js';
+import { registerSettingsRoutes } from './api/settings.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -56,8 +57,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     async (api) => {
       registerHealthRoutes(api);
       registerAuthRoutes(api, deps);
+      registerSettingsRoutes(api, deps);
       // Route groups registered in later tasks:
-      // registerSettingsRoutes(api, deps);
       // registerPushRoutes(api, deps);
       // registerEventRoutes(api, deps);
     },
