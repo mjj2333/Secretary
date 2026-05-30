@@ -1,16 +1,12 @@
-import {
-  decryptJson,
-  encryptJson,
-  hexToKey,
-  type EncryptedEnvelope,
-} from '@secretary/shared-crypto';
+import { CryptoError, decryptJson, encryptJson, hexToKey } from '@secretary/shared-crypto';
 import {
   ENVELOPE_CONTENT_TYPE,
   completeResponseSchema,
+  encryptedEnvelopeSchema,
   type CompleteRequest,
   type CompleteResponse,
 } from '@secretary/llm-protocol';
-import { UpstreamError } from '@secretary/shared-types';
+import { DecryptionError, UpstreamError } from '@secretary/shared-types';
 
 export interface GatewayClientOptions {
   gatewayUrl: string;
@@ -40,26 +36,53 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     headers['CF-Access-Client-Secret'] = opts.cfClientSecret;
   }
 
-  async function post(req: CompleteRequest): Promise<CompleteResponse> {
-    const body = JSON.stringify(encryptJson(key, req));
-    const res = await fetch(url, { method: 'POST', headers, body });
-    if (!res.ok) {
-      throw new UpstreamError('gateway_error', `Gateway returned ${res.status}`, 502);
+  /** Performs the network POST. Retried exactly once on a transient (network) failure. */
+  async function send(body: string): Promise<Response> {
+    try {
+      return await fetch(url, { method: 'POST', headers, body });
+    } catch {
+      // One retry on transient network failure (DNS, connection reset, etc.).
+      return fetch(url, { method: 'POST', headers, body });
     }
-    const envelope = (await res.json()) as EncryptedEnvelope;
-    const decoded = decryptJson<unknown>(key, envelope);
-    return completeResponseSchema.parse(decoded);
   }
 
   return {
     async complete(req: CompleteRequest): Promise<CompleteResponse> {
-      try {
-        return await post(req);
-      } catch (err) {
-        if (err instanceof UpstreamError) throw err;
-        // One retry on transient network/parse failure.
-        return post(req);
+      const body = JSON.stringify(encryptJson(key, req));
+      const res = await send(body);
+
+      if (!res.ok) {
+        throw new UpstreamError('gateway_error', `Gateway returned ${res.status}`, 502);
       }
+
+      // Everything past a received 200 is deterministic — never retried, always
+      // surfaced as a typed SecretaryError.
+      let raw: unknown;
+      try {
+        raw = await res.json();
+      } catch {
+        throw new UpstreamError('gateway_bad_response', 'Gateway returned a non-JSON body', 502);
+      }
+
+      const envelope = encryptedEnvelopeSchema.safeParse(raw);
+      if (!envelope.success) {
+        throw new UpstreamError('gateway_bad_response', 'Gateway returned a malformed envelope', 502);
+      }
+
+      let decoded: unknown;
+      try {
+        decoded = decryptJson<unknown>(key, envelope.data);
+      } catch (err) {
+        throw new DecryptionError(
+          err instanceof CryptoError ? err.message : 'Gateway payload decryption failed',
+        );
+      }
+
+      const parsed = completeResponseSchema.safeParse(decoded);
+      if (!parsed.success) {
+        throw new UpstreamError('gateway_bad_response', 'Gateway returned a malformed completion', 502);
+      }
+      return parsed.data;
     },
   };
 }
