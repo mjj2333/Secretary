@@ -8,6 +8,7 @@ import { registerHealthRoutes } from './api/health.js';
 import { registerAuthRoutes } from './api/auth.js';
 import { registerSettingsRoutes } from './api/settings.js';
 import { registerPushRoutes } from './api/push.js';
+import { registerEventRoutes } from './api/events.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -60,8 +61,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       registerAuthRoutes(api, deps);
       registerSettingsRoutes(api, deps);
       registerPushRoutes(api, deps);
-      // Route groups registered in later tasks:
-      // registerEventRoutes(api, deps);
+      registerEventRoutes(api, deps);
     },
     { prefix: '/api/v1' },
   );
