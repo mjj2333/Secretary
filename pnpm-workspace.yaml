@@ -5,4 +5,6 @@ packages:
 # esbuild's postinstall fetches the platform-specific binary; vitest uses esbuild
 # for source transforms, so this is required.
 allowBuilds:
+  better-sqlite3-multiple-ciphers: true
+  electron: true
   esbuild: true
