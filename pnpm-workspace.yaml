@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# esbuild's postinstall fetches the platform-specific binary; vitest uses esbuild
+# for source transforms, so this is required.
+allowBuilds:
+  esbuild: true

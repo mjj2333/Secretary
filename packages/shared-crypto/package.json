@@ -1,0 +1,31 @@
+{
+  "name": "@secretary/shared-crypto",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist .tsbuildinfo coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
+  }
+}

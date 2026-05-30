@@ -1,0 +1,24 @@
+# Cloudflare Tunnel configuration for the operator's gateway.
+#
+# Replace the placeholders, then place this at
+#   %USERPROFILE%\.cloudflared\config.yml
+# (or pass `--config <path>` to `cloudflared`).
+#
+# Prerequisites:
+#   - You have a Cloudflare account with a zone you control (e.g. example.com).
+#   - You ran `cloudflared tunnel login` and got a credentials file.
+#   - You created a tunnel: `cloudflared tunnel create secretary-gateway`
+#   - You set up DNS:
+#       `cloudflared tunnel route dns secretary-gateway llm.example.com`
+#   - You created a Cloudflare Access application + service token for that hostname.
+
+tunnel: <TUNNEL_UUID>
+credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: llm.<your-domain>
+    service: http://localhost:47823
+    originRequest:
+      connectTimeout: 30s
+      noTLSVerify: true # gateway listens plaintext on 127.0.0.1; cloudflared terminates TLS at the edge
+  - service: http_status:404

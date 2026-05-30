@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Electron / electron-builder
+release/
+*.app/
+
+# Vite / PWA
+.vite/
+
+# Databases (SQLCipher / SQLite)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Secrets and env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+pnpm-debug.log*
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# mkcert certs (locally generated)
+*.pem
+!**/example/*.pem
+
+# Coverage
+coverage/
+.nyc_output/
