@@ -42,6 +42,11 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     reply.code(500).send({ error: { code: 'internal_error', message: 'Internal server error' } });
   });
 
+  // Keep unknown routes / method mismatches on the same {error} envelope as everything else.
+  app.setNotFoundHandler((_req, reply) => {
+    reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
+  });
+
   app.register(
     async (api) => {
       registerHealthRoutes(api);

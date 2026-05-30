@@ -17,4 +17,16 @@ describe('server core', () => {
     expect(res.json().error.code).toBe('unauthorized');
     await app.close();
   });
+
+  it('returns the {error} envelope for an authenticated unknown route (404)', async () => {
+    const { app, session } = await makeTestServer();
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/does-not-exist',
+      headers: { authorization: `Bearer ${session}` },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error.code).toBe('not_found');
+    await app.close();
+  });
 });

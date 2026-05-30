@@ -10,6 +10,12 @@ export type ServerEvent =
 export class EventBus {
   private readonly emitter = new EventEmitter();
 
+  constructor() {
+    // One listener per active SSE connection; a single-user service may exceed the
+    // default ceiling of 10 without it being a leak. Unbounded avoids spurious warnings.
+    this.emitter.setMaxListeners(0);
+  }
+
   emit(event: ServerEvent): void {
     this.emitter.emit('event', event);
   }
