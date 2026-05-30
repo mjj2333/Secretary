@@ -6,7 +6,7 @@
   "main": "./dist/server/index.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && node -e \"require('node:fs').cpSync('server/db/migrations','dist/server/db/migrations',{recursive:true,filter:(s)=>!s.endsWith('.ts')})\"",
+    "build": "tsc -p tsconfig.json && node -e \"const {cpSync}=require('node:fs');cpSync('server/db/migrations','dist/server/db/migrations',{recursive:true,filter:(s)=>!s.endsWith('.ts')});cpSync('pwa','dist/pwa',{recursive:true})\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
