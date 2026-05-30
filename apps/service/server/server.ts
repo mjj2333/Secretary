@@ -5,6 +5,7 @@ import { SecretaryError } from '@secretary/shared-types';
 import type { SessionTokens } from './crypto/SessionTokens.js';
 import type { EventBus } from './eventBus.js';
 import { registerHealthRoutes } from './api/health.js';
+import { registerAuthRoutes } from './api/auth.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -50,8 +51,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.register(
     async (api) => {
       registerHealthRoutes(api);
+      registerAuthRoutes(api, deps);
       // Route groups registered in later tasks:
-      // registerAuthRoutes(api, deps);
       // registerSettingsRoutes(api, deps);
       // registerPushRoutes(api, deps);
       // registerEventRoutes(api, deps);
