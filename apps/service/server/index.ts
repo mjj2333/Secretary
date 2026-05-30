@@ -43,6 +43,24 @@ async function main(): Promise<void> {
 
   // Signal readiness to a parent (Electron) process if forked.
   if (process.send) process.send({ type: 'ready', port: config.port });
+
+  // Graceful shutdown: close the server (flushes in-flight responses) and the DB
+  // (checkpoints WAL) so a tray Quit / Electron kill doesn't leave -wal/-shm behind.
+  let shuttingDown = false;
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(sig, () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      log.info({ sig }, 'shutting down');
+      void app
+        .close()
+        .catch(() => undefined)
+        .then(() => {
+          db.close();
+          process.exit(0);
+        });
+    });
+  }
 }
 
 main().catch((err) => {
