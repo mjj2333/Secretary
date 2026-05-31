@@ -33,8 +33,92 @@ export interface PushSubscriptionRow {
   last_used_at: number | null;
 }
 
-/**
- * Remaining table row types (threads, messages, contacts, drafts, follow_ups,
- * action_log, style_examples) are added in the phases whose repositories consume
- * them (Phases 3–6), to avoid unused declarations now.
- */
+export interface ThreadRow {
+  id: string;
+  account_id: string;
+  provider_thread_id: string | null;
+  subject_normalized: string | null;
+  participants: string | null;
+  message_count: number;
+  first_message_at: number | null;
+  last_message_at: number | null;
+  last_inbound_at: number | null;
+  last_outbound_at: number | null;
+  state:
+    | 'needs_classification'
+    | 'awaiting_their_reply'
+    | 'awaiting_your_reply'
+    | 'closed'
+    | 'scheduled_followup'
+    | 'informational';
+  state_changed_at: number | null;
+  state_reason: string | null;
+  sla_deadline: number | null;
+  urgency: 'low' | 'normal' | 'high' | null;
+  last_agent_summary: string | null;
+  is_archived: number;
+}
+
+export interface MessageRow {
+  id: string;
+  account_id: string;
+  provider_id: string;
+  thread_id: string;
+  message_id_header: string | null;
+  in_reply_to: string | null;
+  references_header: string | null;
+  from_address: string;
+  from_name: string | null;
+  to_addresses: string | null;
+  cc_addresses: string | null;
+  bcc_addresses: string | null;
+  subject: string | null;
+  body_text: string | null;
+  body_html: string | null;
+  snippet: string | null;
+  direction: 'inbound' | 'outbound';
+  date_sent: number | null;
+  date_received: number | null;
+  is_read: number | null;
+  is_starred: number | null;
+  is_draft: number | null;
+  folder: string | null;
+  labels: string | null;
+  attachments_meta: string | null;
+  raw_size_bytes: number | null;
+  synced_at: number | null;
+}
+
+export interface ContactRow {
+  id: string;
+  email_address: string;
+  display_name: string | null;
+  aliases: string | null;
+  category:
+    | 'client_established'
+    | 'client_new'
+    | 'screening'
+    | 'personal'
+    | 'vendor'
+    | 'noise'
+    | 'unknown';
+  notes: string | null;
+  first_contact_at: number | null;
+  last_contact_at: number | null;
+  total_messages_in: number;
+  total_messages_out: number;
+  style_notes: string | null;
+  do_not_auto_draft: number;
+  screening_status: string | null;
+  booking_history: string | null;
+}
+
+export interface ActionLogRow {
+  id: string;
+  timestamp: number;
+  actor: 'agent' | 'user' | 'system';
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: string | null;
+}

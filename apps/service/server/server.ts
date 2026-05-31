@@ -12,6 +12,12 @@ import { registerAuthRoutes } from './api/auth.js';
 import { registerSettingsRoutes } from './api/settings.js';
 import { registerPushRoutes } from './api/push.js';
 import { registerEventRoutes } from './api/events.js';
+import type { ProviderRegistry } from './providers/ProviderRegistry.js';
+import type { SyncManager } from './sync/SyncManager.js';
+import type { SecretStore } from './auth/SecretStore.js';
+import type { EmailProvider, ImapConfig } from './providers/ProviderInterface.js';
+import { registerAccountsRoutes } from './api/accounts.js';
+import { registerThreadsRoutes } from './api/threads.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -22,6 +28,11 @@ export interface ServerDeps {
   https?: HttpsOptions;
   /** Directory containing the placeholder/PWA static files. Omitted in tests by default. */
   pwaDir?: string;
+  providers: ProviderRegistry;
+  sync: SyncManager;
+  secrets: SecretStore;
+  /** Builds a provider for a resolved config — injectable so tests use a fake. */
+  providerFactory: (config: ImapConfig) => EmailProvider;
 }
 
 /**
@@ -55,11 +66,24 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   // Unified error envelope.
-  app.setErrorHandler((err, _req, reply) => {
+  app.setErrorHandler((err, req, reply) => {
     if (err instanceof SecretaryError) {
       reply.code(err.status).send({ error: { code: err.code, message: err.message } });
       return;
     }
+    // Fastify (and similar) errors carry their own statusCode — e.g. a 400 for a
+    // malformed JSON body. Surface client errors instead of masking them as 500.
+    const status =
+      typeof (err as { statusCode?: unknown }).statusCode === 'number'
+        ? (err as { statusCode: number }).statusCode
+        : 500;
+    if (status >= 400 && status < 500) {
+      const message = err instanceof Error ? err.message : 'Bad request';
+      reply.code(status).send({ error: { code: 'bad_request', message } });
+      return;
+    }
+    // Last-resort: log the real cause server-side (never leak it in the response).
+    console.error(`[secretary] unhandled error on ${req.method} ${req.url}:`, err);
     reply.code(500).send({ error: { code: 'internal_error', message: 'Internal server error' } });
   });
 
@@ -82,6 +106,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       registerSettingsRoutes(api, deps);
       registerPushRoutes(api, deps);
       registerEventRoutes(api, deps);
+      registerAccountsRoutes(api, deps);
+      registerThreadsRoutes(api, deps);
     },
     { prefix: '/api/v1' },
   );

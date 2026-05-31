@@ -39,7 +39,13 @@ module.exports = {
     'class-methods-use-this': 'off', // small private helpers needn't touch `this`
     'no-useless-constructor': 'off', // TS parameter-property constructors are not useless
     '@typescript-eslint/no-useless-constructor': 'error',
-    'no-empty-function': ['error', { allow: ['arrowFunctions', 'constructors'] }],
+    'no-empty-function': [
+      'error',
+      { allow: ['arrowFunctions', 'constructors', 'methods', 'asyncMethods'] },
+    ],
+    'no-continue': 'off', // guard-style `continue` in sync/fetch loops is clear
+    'no-await-in-loop': 'off', // IMAP fetch/lock loops are intentionally sequential
+    'no-nested-ternary': 'off', // bounded value-coercion ternaries (e.g. Date|string|undefined)
   },
   overrides: [
     {

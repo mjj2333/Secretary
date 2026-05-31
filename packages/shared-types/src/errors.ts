@@ -53,3 +53,9 @@ export class UpstreamError extends SecretaryError {
     super(code, message, status);
   }
 }
+
+export class ImapError extends SecretaryError {
+  constructor(message = 'IMAP connection failed') {
+    super('imap_connection_failed', message, 400);
+  }
+}

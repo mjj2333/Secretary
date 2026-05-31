@@ -24,6 +24,9 @@
     "@secretary/shared-types": "workspace:*",
     "better-sqlite3-multiple-ciphers": "^11.5.0",
     "fastify": "^5.1.0",
+    "imapflow": "^1.3.4",
+    "mailparser": "^3.9.9",
+    "nodemailer": "^8.0.10",
     "pino": "^9.5.0",
     "zod": "^3.23.8"
   },
@@ -31,6 +34,7 @@
     "@electron/rebuild": "3.6.2",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.16.0",
+    "@types/nodemailer": "^8.0.0",
     "@vitest/coverage-v8": "^2.1.0",
     "electron": "^33.2.0",
     "pino-pretty": "^11.2.2",
