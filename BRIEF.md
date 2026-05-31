@@ -441,7 +441,7 @@ Migrations are sequential `.sql` files in `apps/service/server/db/migrations/`. 
 Pre-populated keys (with defaults):
 
 - `agent.classify_on_inbound` = `true`
-- `agent.autodraft_on_inbound` = `true`
+- `agent.autodraft_on_inbound` = `false` (Phase 5: shipped off; the auto-draft hook is built but dormant until enabled)
 - `agent.poll_interval_seconds` = `60`
 - `agent.sla.client_established.awaiting_your_reply_hours` = `12`
 - `agent.sla.client_new.awaiting_your_reply_hours` = `4`
@@ -754,6 +754,13 @@ Inputs assembled by `PromptAssembler.buildDraftPrompt(threadId, rawIntent?)`:
 - "Return only the email body. No preamble. No subject line."
 
 Calls `GatewayClient.complete()` with `temperature` from settings. Writes a new `drafts` row with `version = max(existing)+1`, status `pending_review`. Emits SSE `draft:ready` event. Triggers Web Push to all subscriptions.
+
+**Phase 5 implementation notes:**
+
+- The Classifier→draft hook (step 4 above) is built but **gated**: it fires only when `agent.autodraft_on_inbound` is `true` AND the contact is not `do_not_auto_draft`. The seeded default for `agent.autodraft_on_inbound` is **`false`** (changed from `true`) so drafting is on-demand until enabled.
+- **Manual draft creation (`POST /drafts`) is synchronous** — it awaits the LLM and returns the finished draft. Only the auto path is queued (a shared `SequentialQueue` serializes all classify + draft LLM calls on the single GPU).
+- Replies address the **sender of the latest inbound message only** (v1; not reply-all); subject is `Re: <subject>` (a single prefix, original casing preserved, Re:/Fwd: chains not stripped); threading uses that message's RFC `Message-ID`.
+- `polish_diff` is a line-level diff (raw intent → polished body), stored as JSON.
 
 ### State transition rules (§11.1)
 

@@ -9,6 +9,7 @@ import { ActionLogRepository } from '../server/db/repositories/ActionLogReposito
 import { ContactsRepository } from '../server/db/repositories/ContactsRepository.js';
 import { MessagesRepository } from '../server/db/repositories/MessagesRepository.js';
 import { SettingsRepository } from '../server/db/repositories/SettingsRepository.js';
+import { StyleExamplesRepository } from '../server/db/repositories/StyleExamplesRepository.js';
 import { ThreadsRepository } from '../server/db/repositories/ThreadsRepository.js';
 import { EventBus } from '../server/eventBus.js';
 import { StateMachine } from '../server/agent/StateMachine.js';
@@ -75,7 +76,11 @@ function seed(): Ctx {
   return { db, threads, messages, actions: new ActionLogRepository(db), threadId, messageId };
 }
 
-function makeClassifier(ctx: Ctx, gateway: FakeGateway | ThrowingGateway | null): Classifier {
+function makeClassifier(
+  ctx: Ctx,
+  gateway: FakeGateway | ThrowingGateway | null,
+  onDraftEligible?: (threadId: string) => void,
+): Classifier {
   const settings = new SettingsRepository(ctx.db);
   const contacts = new ContactsRepository(ctx.db);
   const eventBus = new EventBus();
@@ -87,7 +92,13 @@ function makeClassifier(ctx: Ctx, gateway: FakeGateway | ThrowingGateway | null)
     eventBus,
     () => 10_000,
   );
-  const prompts = new PromptAssembler(ctx.messages, ctx.threads, contacts);
+  const prompts = new PromptAssembler(
+    ctx.messages,
+    ctx.threads,
+    contacts,
+    settings,
+    new StyleExamplesRepository(ctx.db),
+  );
   return new Classifier(
     prompts,
     gateway,
@@ -97,8 +108,10 @@ function makeClassifier(ctx: Ctx, gateway: FakeGateway | ThrowingGateway | null)
     ctx.actions,
     eventBus,
     settings,
+    contacts,
     NOOP_LOG,
     () => 10_000,
+    onDraftEligible,
   );
 }
 
@@ -167,5 +180,51 @@ describe('Classifier.classify', () => {
     ctx.db.close();
     expect(t.state).toBe('needs_classification');
     expect(log.n).toBe(1);
+  });
+});
+
+describe('Classifier auto-draft eligibility', () => {
+  it('fires onDraftEligible when requires_response + autodraft_on_inbound + not do_not_auto_draft', async () => {
+    const ctx = seed();
+    new SettingsRepository(ctx.db).set('agent.autodraft_on_inbound', true);
+    const eligible: string[] = [];
+    const gw = new FakeGateway([
+      '{"requires_response":true,"urgency":"normal","summary":"needs reply"}',
+    ]);
+    await makeClassifier(ctx, gw, (id) => eligible.push(id)).classify(ctx.messageId);
+    ctx.db.close();
+    expect(eligible).toEqual([ctx.threadId]);
+  });
+
+  it('does NOT fire when requires_response is false', async () => {
+    const ctx = seed();
+    new SettingsRepository(ctx.db).set('agent.autodraft_on_inbound', true);
+    const eligible: string[] = [];
+    const gw = new FakeGateway(['{"requires_response":false,"summary":"fyi"}']);
+    await makeClassifier(ctx, gw, (id) => eligible.push(id)).classify(ctx.messageId);
+    ctx.db.close();
+    expect(eligible).toEqual([]);
+  });
+
+  it('does NOT fire when autodraft_on_inbound is false', async () => {
+    const ctx = seed();
+    new SettingsRepository(ctx.db).set('agent.autodraft_on_inbound', false);
+    const eligible: string[] = [];
+    const gw = new FakeGateway(['{"requires_response":true,"summary":"x"}']);
+    await makeClassifier(ctx, gw, (id) => eligible.push(id)).classify(ctx.messageId);
+    ctx.db.close();
+    expect(eligible).toEqual([]);
+  });
+
+  it('does NOT fire when the contact is do_not_auto_draft', async () => {
+    const ctx = seed();
+    new SettingsRepository(ctx.db).set('agent.autodraft_on_inbound', true);
+    const contacts = new ContactsRepository(ctx.db);
+    contacts.patch(contacts.findByEmail('alice@x.com')!.id, { doNotAutoDraft: true });
+    const eligible: string[] = [];
+    const gw = new FakeGateway(['{"requires_response":true,"summary":"x"}']);
+    await makeClassifier(ctx, gw, (id) => eligible.push(id)).classify(ctx.messageId);
+    ctx.db.close();
+    expect(eligible).toEqual([]);
   });
 });

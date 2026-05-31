@@ -134,3 +134,37 @@ export interface FollowUpRow {
   surfaced_at: number | null;
   resolved_at: number | null;
 }
+
+export interface DraftRow {
+  id: string;
+  thread_id: string;
+  account_id: string;
+  version: number;
+  in_reply_to_message_id: string | null;
+  to_addresses: string | null;
+  cc_addresses: string | null;
+  subject: string | null;
+  body_text: string;
+  body_html: string | null;
+  raw_intent: string | null;
+  polish_diff: string | null;
+  system_prompt_used: string | null;
+  model_used: string | null;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  latency_ms: number | null;
+  status: 'pending_review' | 'editing' | 'sent' | 'discarded' | 'failed';
+  created_at: number | null;
+  sent_at: number | null;
+  final_body_sent: string | null;
+}
+
+export interface StyleExampleRow {
+  id: string;
+  source_message_id: string | null;
+  contact_category: string | null;
+  context_summary: string | null;
+  reply_text: string | null;
+  tags: string | null;
+  embedding: Buffer | null;
+}

@@ -139,3 +139,29 @@ export interface ContactView {
   totalMessagesOut: number;
   lastContactAt: string | null;
 }
+
+export type DraftStatus = 'pending_review' | 'editing' | 'sent' | 'discarded' | 'failed';
+
+/** One line of a raw-intent → polished-body diff (BRIEF §6 polish_diff). */
+export interface DiffOp {
+  op: 'eq' | 'add' | 'del';
+  line: string;
+}
+
+/** A draft as returned by the drafts API (ISO dates per §16). */
+export interface DraftView {
+  id: string;
+  threadId: string;
+  accountId: string;
+  version: number;
+  to: EmailAddress[];
+  cc: EmailAddress[];
+  subject: string | null;
+  bodyText: string;
+  rawIntent: string | null;
+  polishDiff: DiffOp[] | null;
+  status: DraftStatus;
+  modelUsed: string | null;
+  createdAt: string | null;
+  sentAt: string | null;
+}

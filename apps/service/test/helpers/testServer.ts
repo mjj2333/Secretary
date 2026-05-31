@@ -17,6 +17,12 @@ import { ThreadsRepository } from '../../server/db/repositories/ThreadsRepositor
 import { ContactsRepository } from '../../server/db/repositories/ContactsRepository.js';
 import { SettingsRepository } from '../../server/db/repositories/SettingsRepository.js';
 import { ActionLogRepository } from '../../server/db/repositories/ActionLogRepository.js';
+import { Drafter } from '../../server/agent/Drafter.js';
+import { DraftsRepository } from '../../server/db/repositories/DraftsRepository.js';
+import { StyleExamplesRepository } from '../../server/db/repositories/StyleExamplesRepository.js';
+import { PromptAssembler } from '../../server/agent/PromptAssembler.js';
+import { MessagesRepository } from '../../server/db/repositories/MessagesRepository.js';
+import { FakeGateway } from './fakeGateway.js';
 
 export interface TestServer {
   app: FastifyInstance;
@@ -31,11 +37,12 @@ export interface TestServer {
   madeProviders: FakeEmailProvider[];
   classificationQueue: { enqueued: string[]; enqueue(messageId: string): void };
   stateMachine: StateMachine;
+  drafter: Drafter;
 }
 
 /** Builds a fully-wired server against a temp encrypted DB and an in-memory secret store. */
 export async function makeTestServer(
-  opts: { consumeBootstrap?: boolean; pwaDir?: string } = {},
+  opts: { consumeBootstrap?: boolean; pwaDir?: string; draftBody?: string } = {},
 ): Promise<TestServer> {
   const dir = mkdtempSync(join(tmpdir(), 'secretary-srv-'));
   const store = new InMemorySecretStore();
@@ -65,6 +72,25 @@ export async function makeTestServer(
     eventBus,
   );
 
+  const drafterPrompts = new PromptAssembler(
+    new MessagesRepository(db),
+    new ThreadsRepository(db),
+    new ContactsRepository(db),
+    new SettingsRepository(db),
+    new StyleExamplesRepository(db),
+  );
+  const drafter = new Drafter(
+    drafterPrompts,
+    new FakeGateway([opts.draftBody ?? 'Drafted reply body.']),
+    new DraftsRepository(db),
+    new MessagesRepository(db),
+    new ThreadsRepository(db),
+    new ActionLogRepository(db),
+    eventBus,
+    new SettingsRepository(db),
+    { info() {}, warn() {} },
+  );
+
   const app = buildServer({
     db,
     sessions,
@@ -76,6 +102,7 @@ export async function makeTestServer(
     providerFactory,
     classificationQueue,
     stateMachine,
+    drafter,
     ...(opts.pwaDir ? { pwaDir: opts.pwaDir } : {}),
   });
   await app.ready();
@@ -98,5 +125,6 @@ export async function makeTestServer(
     madeProviders,
     classificationQueue,
     stateMachine,
+    drafter,
   };
 }

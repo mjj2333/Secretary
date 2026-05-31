@@ -7,6 +7,8 @@ import { InMemorySecretStore } from '../server/auth/SecretStore.js';
 import { openDatabase } from '../server/db/connection.js';
 import { ContactsRepository } from '../server/db/repositories/ContactsRepository.js';
 import { MessagesRepository } from '../server/db/repositories/MessagesRepository.js';
+import { SettingsRepository } from '../server/db/repositories/SettingsRepository.js';
+import { StyleExamplesRepository } from '../server/db/repositories/StyleExamplesRepository.js';
 import { ThreadsRepository } from '../server/db/repositories/ThreadsRepository.js';
 import { PromptAssembler } from '../server/agent/PromptAssembler.js';
 
@@ -73,7 +75,13 @@ describe('PromptAssembler.buildClassificationPrompt', () => {
       msg('5', 'alice@x.com', 'B'.repeat(2500), 5000),
     )!;
 
-    const assembler = new PromptAssembler(messages, threads, contacts);
+    const assembler = new PromptAssembler(
+      messages,
+      threads,
+      contacts,
+      new SettingsRepository(db),
+      new StyleExamplesRepository(db),
+    );
     const { system, prompt } = assembler.buildClassificationPrompt(targetId);
 
     expect(system).toContain('requires_response'); // classifier.md loaded
@@ -95,6 +103,8 @@ describe('PromptAssembler.buildClassificationPrompt', () => {
       new MessagesRepository(db),
       new ThreadsRepository(db),
       new ContactsRepository(db),
+      new SettingsRepository(db),
+      new StyleExamplesRepository(db),
     );
     expect(() => assembler.buildClassificationPrompt('nope')).toThrow(/not found/i);
     db.close();

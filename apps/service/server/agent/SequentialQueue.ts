@@ -1,24 +1,23 @@
-export interface ClassificationWorker {
-  classify(messageId: string): Promise<void>;
-}
+/** A worker processes one id at a time; it should be self-contained (not throw). */
+export type SequentialWorker = (id: string) => Promise<void>;
 
-/** In-process FIFO queue draining one classification at a time (single GPU friendliness). */
-export class ClassificationQueue {
+/** In-process FIFO queue draining one job at a time (single-GPU friendliness). */
+export class SequentialQueue {
   private readonly order: string[] = [];
   private readonly queued = new Set<string>();
   private draining = false;
   private idleResolvers: Array<() => void> = [];
 
-  constructor(private readonly worker: ClassificationWorker) {}
+  constructor(private readonly worker: SequentialWorker) {}
 
-  enqueue(messageId: string): void {
-    if (this.queued.has(messageId)) return;
-    this.queued.add(messageId);
-    this.order.push(messageId);
+  enqueue(id: string): void {
+    if (this.queued.has(id)) return;
+    this.queued.add(id);
+    this.order.push(id);
     void this.drain();
   }
 
-  /** Number of pending (not-yet-started) items. The in-flight job, if any, is not counted; use onIdle() to await full drain. */
+  /** Number of pending (not-yet-started) items; the in-flight job is not counted. */
   size(): number {
     return this.order.length;
   }
@@ -39,12 +38,12 @@ export class ClassificationQueue {
         const id = this.order.shift();
         if (id === undefined) break;
         try {
-          await this.worker.classify(id);
+          await this.worker(id);
         } catch (err) {
-          // The worker (Classifier) is expected to be self-contained; this is a backstop so a
-          // contract-violating throw can't stall the drain loop or vanish silently.
+          // Workers are expected to be self-contained; backstop so a contract-violating
+          // throw can't stall the drain loop or vanish silently.
           console.error(
-            `[secretary] classification job failed (${id}):`,
+            `[secretary] sequential-queue job failed (${id}):`,
             err instanceof Error ? err.message : err,
           );
         }

@@ -20,6 +20,7 @@ import type { EmailProvider, ImapConfig } from './providers/ProviderInterface.js
 import { registerAccountsRoutes } from './api/accounts.js';
 import { registerThreadsRoutes } from './api/threads.js';
 import { registerContactsRoutes } from './api/contacts.js';
+import { registerDraftsRoutes } from './api/drafts.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -38,7 +39,17 @@ export interface ServerDeps {
   /** Enqueue a message id for asynchronous classification. */
   classificationQueue: { enqueue(messageId: string): void };
   /** Apply manual thread state overrides. */
-  stateMachine: { onManual(threadId: string, state: ThreadState, reason?: string): void };
+  stateMachine: {
+    onManual(threadId: string, state: ThreadState, reason?: string): void;
+    onOutbound(threadId: string): void;
+  };
+  /** Synchronously generate a draft for a thread (manual create/regenerate). */
+  drafter: {
+    draft(
+      threadId: string,
+      opts?: { rawIntent?: string },
+    ): Promise<import('./db/schema.js').DraftRow | null>;
+  };
 }
 
 /**
@@ -115,6 +126,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       registerAccountsRoutes(api, deps);
       registerThreadsRoutes(api, deps);
       registerContactsRoutes(api, deps);
+      registerDraftsRoutes(api, deps);
     },
     { prefix: '/api/v1' },
   );

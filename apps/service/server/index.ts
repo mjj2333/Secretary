@@ -23,11 +23,14 @@ import { ContactsRepository } from './db/repositories/ContactsRepository.js';
 import { SettingsRepository } from './db/repositories/SettingsRepository.js';
 import { ActionLogRepository } from './db/repositories/ActionLogRepository.js';
 import { FollowUpsRepository } from './db/repositories/FollowUpsRepository.js';
+import { StyleExamplesRepository } from './db/repositories/StyleExamplesRepository.js';
 import { createGatewayClient, type GatewayClient } from './llm/GatewayClient.js';
 import { PromptAssembler } from './agent/PromptAssembler.js';
 import { Classifier } from './agent/Classifier.js';
-import { ClassificationQueue } from './agent/ClassificationQueue.js';
+import { Drafter } from './agent/Drafter.js';
+import { SequentialQueue } from './agent/SequentialQueue.js';
 import { FollowUpEngine } from './agent/FollowUpEngine.js';
+import { DraftsRepository } from './db/repositories/DraftsRepository.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -60,6 +63,7 @@ async function main(): Promise<void> {
   const settingsRepo = new SettingsRepository(db);
   const actionsRepo = new ActionLogRepository(db);
   const followUpsRepo = new FollowUpsRepository(db);
+  const styleExamplesRepo = new StyleExamplesRepository(db);
 
   // GatewayClient — only built when keychain credentials are present
   let gateway: GatewayClient | null = null;
@@ -90,7 +94,27 @@ async function main(): Promise<void> {
     actionsRepo,
     eventBus,
   );
-  const promptAssembler = new PromptAssembler(messagesRepo, threadsRepo, contactsRepo);
+  const promptAssembler = new PromptAssembler(
+    messagesRepo,
+    threadsRepo,
+    contactsRepo,
+    settingsRepo,
+    styleExamplesRepo,
+  );
+  const drafter = new Drafter(
+    promptAssembler,
+    gateway,
+    new DraftsRepository(db),
+    messagesRepo,
+    threadsRepo,
+    actionsRepo,
+    eventBus,
+    settingsRepo,
+    log,
+  );
+  const draftQueue = new SequentialQueue((threadId) =>
+    drafter.draft(threadId).then(() => undefined),
+  );
   const classifier = new Classifier(
     promptAssembler,
     gateway,
@@ -100,9 +124,12 @@ async function main(): Promise<void> {
     actionsRepo,
     eventBus,
     settingsRepo,
+    contactsRepo,
     log,
+    Date.now,
+    (threadId) => draftQueue.enqueue(threadId),
   );
-  const classificationQueue = new ClassificationQueue(classifier);
+  const classificationQueue = new SequentialQueue((id) => classifier.classify(id));
   const followUpEngine = new FollowUpEngine(db, threadsRepo, followUpsRepo, actionsRepo, eventBus);
 
   const providers = new ProviderRegistry();
@@ -129,6 +156,7 @@ async function main(): Promise<void> {
     providerFactory,
     classificationQueue,
     stateMachine,
+    drafter,
   });
 
   await app.listen({ port: config.port, host: config.host });

@@ -7,6 +7,8 @@ export class FakeEmailProvider implements EmailProvider {
   private onChange: (() => void) | null = null;
   private incremental: RawMessage[] = [];
   private sendCount = 0;
+  lastSend: SendInput | null = null;
+  failSend = false;
 
   constructor(
     public readonly accountId: string,
@@ -49,7 +51,9 @@ export class FakeEmailProvider implements EmailProvider {
     this.onChange = null;
   }
 
-  async sendMessage(_input: SendInput): Promise<{ providerMessageId: string }> {
+  async sendMessage(input: SendInput): Promise<{ providerMessageId: string }> {
+    if (this.failSend) throw new Error('fake send failure');
+    this.lastSend = input;
     this.sendCount += 1;
     return { providerMessageId: `fake-${this.sendCount}` };
   }

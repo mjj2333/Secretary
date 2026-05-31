@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3-multiple-ciphers';
 /** Default settings from BRIEF §6. Stored as JSON strings in the `value` column. */
 const DEFAULTS: Record<string, unknown> = {
   'agent.classify_on_inbound': true,
-  'agent.autodraft_on_inbound': true,
+  'agent.autodraft_on_inbound': false,
   'agent.poll_interval_seconds': 60,
   'agent.sla.client_established.awaiting_your_reply_hours': 12,
   'agent.sla.client_new.awaiting_your_reply_hours': 4,

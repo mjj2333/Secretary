@@ -1,6 +1,7 @@
 import type { ClassificationResult } from '@secretary/shared-types';
 import type { GatewayClient } from '../llm/GatewayClient.js';
 import type { ActionLogRepository } from '../db/repositories/ActionLogRepository.js';
+import type { ContactsRepository } from '../db/repositories/ContactsRepository.js';
 import type { MessagesRepository } from '../db/repositories/MessagesRepository.js';
 import type { SettingsRepository } from '../db/repositories/SettingsRepository.js';
 import type { ThreadsRepository } from '../db/repositories/ThreadsRepository.js';
@@ -33,8 +34,10 @@ export class Classifier {
     private readonly actions: ActionLogRepository,
     private readonly eventBus: EventBus,
     private readonly settings: SettingsRepository,
+    private readonly contacts: ContactsRepository,
     private readonly log: MiniLogger,
     private readonly now: () => number = Date.now,
+    private readonly onDraftEligible?: (threadId: string) => void,
   ) {}
 
   /** Classify one inbound message. Never throws — safe to drive from the queue. */
@@ -100,6 +103,23 @@ export class Classifier {
         type: 'thread:updated',
         payload: { threadId, accountId: message.account_id },
       });
+      // Auto-draft eligibility is isolated: a fault here (settings/contacts read, or a throwing
+      // hook) must never turn an already-successful classification into a classification_failed.
+      if (result.requires_response && this.onDraftEligible) {
+        try {
+          if (this.settings.get<boolean>('agent.autodraft_on_inbound') === true) {
+            const contact = this.contacts.findByEmail(message.from_address);
+            if (contact?.do_not_auto_draft !== 1) {
+              this.onDraftEligible(threadId);
+            }
+          }
+        } catch (hookErr) {
+          this.log.warn(
+            { threadId, err: hookErr instanceof Error ? hookErr.message : 'unknown' },
+            'auto-draft eligibility check failed; skipping hook',
+          );
+        }
+      }
     } catch (err) {
       this.log.warn(
         { threadId, err: err instanceof Error ? err.message : 'unknown' },
