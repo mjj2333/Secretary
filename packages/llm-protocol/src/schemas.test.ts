@@ -30,9 +30,7 @@ describe('encryptedEnvelopeSchema', () => {
 
 describe('completeRequestSchema', () => {
   it('accepts a minimal request', () => {
-    expect(
-      completeRequestSchema.safeParse({ model: 'qwen', prompt: 'hi' }).success,
-    ).toBe(true);
+    expect(completeRequestSchema.safeParse({ model: 'qwen', prompt: 'hi' }).success).toBe(true);
   });
 
   it('accepts a fully populated request', () => {

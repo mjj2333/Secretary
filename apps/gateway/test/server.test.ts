@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { decryptJson, encryptJson } from '@secretary/shared-crypto';
+import { decryptJson, encryptJson, hexToKey } from '@secretary/shared-crypto';
 import { ENVELOPE_CONTENT_TYPE, type CompleteResponse } from '@secretary/llm-protocol';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '../src/server.js';
@@ -11,7 +11,6 @@ import {
   makeTestConfig,
   silentLogger,
 } from './helpers.js';
-import { hexToKey } from '@secretary/shared-crypto';
 
 describe('gateway server', () => {
   let app: FastifyInstance;

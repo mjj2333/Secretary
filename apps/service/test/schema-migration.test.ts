@@ -4,8 +4,16 @@ import { runMigrations } from '../server/db/migrate.js';
 import { migrations } from '../server/db/migrations/index.js';
 
 const TABLES = [
-  'accounts', 'messages', 'threads', 'contacts', 'drafts',
-  'follow_ups', 'action_log', 'settings', 'push_subscriptions', 'style_examples',
+  'accounts',
+  'messages',
+  'threads',
+  'contacts',
+  'drafts',
+  'follow_ups',
+  'action_log',
+  'settings',
+  'push_subscriptions',
+  'style_examples',
 ];
 
 describe('0001_init migration', () => {

@@ -19,7 +19,7 @@ describe('hexToKey', () => {
   });
 
   it('accepts upper and lower case', () => {
-    const buf = hexToKey('AbCdEf'.repeat(10) + 'aBcD');
+    const buf = hexToKey(`${'AbCdEf'.repeat(10)}aBcD`);
     expect(buf.length).toBe(32);
   });
 

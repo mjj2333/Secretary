@@ -24,40 +24,41 @@
 
 ## File responsibility map
 
-| File | Responsibility |
-|---|---|
-| `apps/service/package.json` / `tsconfig.json` / `vitest.config.ts` | Package scaffold + scripts |
-| `apps/service/scripts/set-secret.ts` | Dev utility to write a secret into the keychain |
-| `server/auth/SecretStore.ts` | `SecretStore` interface + `InMemorySecretStore` |
-| `server/auth/KeychainStore.ts` | `SecretStore` impl over `@napi-rs/keyring` |
-| `server/config.ts` | zod env schema → `Config` |
-| `server/logger.ts` | pino logger factory (metadata only) |
-| `server/db/migrate.ts` | Migration runner (`_migrations` table) |
-| `server/db/migrations/0001_init.sql` | All §6 tables + indexes |
-| `server/db/schema.ts` | Row types for all tables |
-| `server/db/seed.ts` | Idempotent settings defaults |
-| `server/db/connection.ts` | Open SQLCipher w/ keychain key, migrate + seed |
-| `server/db/repositories/SettingsRepository.ts` | Typed settings access |
-| `server/db/repositories/PushSubscriptionRepository.ts` | Push subscription rows |
-| `server/llm/GatewayClient.ts` | Encrypted gateway round-trip |
-| `server/crypto/SessionTokens.ts` | Bootstrap + HMAC session tokens |
-| `server/eventBus.ts` | In-process event emitter for SSE |
-| `server/api/*.ts` | Route groups (health/auth/settings/push/events) |
-| `server/server.ts` | `buildServer(deps)` Fastify factory |
-| `server/httpsOptions.ts` | Load cert/key from config paths |
-| `server/setup/firstRun.ts` | Setup detection + needs-setup flag |
-| `server/index.ts` | Headless entrypoint (Node or Electron child) |
-| `apps/service/pwa/index.html` | Placeholder page |
-| `electron/server-process.ts` | Fork + supervise server child |
-| `electron/tray-menu.ts` | Tray menu construction |
-| `electron/main.ts` | Electron tray app |
-| `infra/mkcert/setup-certs.ps1` | Generate dev HTTPS certs |
+| File                                                               | Responsibility                                  |
+| ------------------------------------------------------------------ | ----------------------------------------------- |
+| `apps/service/package.json` / `tsconfig.json` / `vitest.config.ts` | Package scaffold + scripts                      |
+| `apps/service/scripts/set-secret.ts`                               | Dev utility to write a secret into the keychain |
+| `server/auth/SecretStore.ts`                                       | `SecretStore` interface + `InMemorySecretStore` |
+| `server/auth/KeychainStore.ts`                                     | `SecretStore` impl over `@napi-rs/keyring`      |
+| `server/config.ts`                                                 | zod env schema → `Config`                       |
+| `server/logger.ts`                                                 | pino logger factory (metadata only)             |
+| `server/db/migrate.ts`                                             | Migration runner (`_migrations` table)          |
+| `server/db/migrations/0001_init.sql`                               | All §6 tables + indexes                         |
+| `server/db/schema.ts`                                              | Row types for all tables                        |
+| `server/db/seed.ts`                                                | Idempotent settings defaults                    |
+| `server/db/connection.ts`                                          | Open SQLCipher w/ keychain key, migrate + seed  |
+| `server/db/repositories/SettingsRepository.ts`                     | Typed settings access                           |
+| `server/db/repositories/PushSubscriptionRepository.ts`             | Push subscription rows                          |
+| `server/llm/GatewayClient.ts`                                      | Encrypted gateway round-trip                    |
+| `server/crypto/SessionTokens.ts`                                   | Bootstrap + HMAC session tokens                 |
+| `server/eventBus.ts`                                               | In-process event emitter for SSE                |
+| `server/api/*.ts`                                                  | Route groups (health/auth/settings/push/events) |
+| `server/server.ts`                                                 | `buildServer(deps)` Fastify factory             |
+| `server/httpsOptions.ts`                                           | Load cert/key from config paths                 |
+| `server/setup/firstRun.ts`                                         | Setup detection + needs-setup flag              |
+| `server/index.ts`                                                  | Headless entrypoint (Node or Electron child)    |
+| `apps/service/pwa/index.html`                                      | Placeholder page                                |
+| `electron/server-process.ts`                                       | Fork + supervise server child                   |
+| `electron/tray-menu.ts`                                            | Tray menu construction                          |
+| `electron/main.ts`                                                 | Electron tray app                               |
+| `infra/mkcert/setup-certs.ps1`                                     | Generate dev HTTPS certs                        |
 
 ---
 
 ## Task 1: Scaffold the `apps/service` package and verify native modules load
 
 **Files:**
+
 - Create: `apps/service/package.json`
 - Create: `apps/service/tsconfig.json`
 - Create: `apps/service/vitest.config.ts`
@@ -181,6 +182,7 @@ git commit -m "chore(service): scaffold apps/service package and verify native s
 ## Task 2: SecretStore interface, in-memory impl, keychain impl, dev set-secret script
 
 **Files:**
+
 - Create: `apps/service/server/auth/SecretStore.ts`
 - Create: `apps/service/server/auth/KeychainStore.ts`
 - Create: `apps/service/scripts/set-secret.ts`
@@ -328,6 +330,7 @@ git commit -m "feat(service): add SecretStore interface, keychain + in-memory im
 ## Task 3: config.ts
 
 **Files:**
+
 - Create: `apps/service/server/config.ts`
 - Test: `apps/service/test/config.test.ts`
 
@@ -383,9 +386,7 @@ const envSchema = z.object({
   SERVICE_KEY_PATH: z.string().optional(),
   GATEWAY_URL: z.string().url().default('http://localhost:47823'),
   GATEWAY_USE_CF_HEADERS: boolFlag.default('false'),
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-    .default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   LOG_PRETTY: boolFlag.default('false'),
 });
 
@@ -443,6 +444,7 @@ git commit -m "feat(service): add config loader with local-direct gateway defaul
 ## Task 4: logger.ts
 
 **Files:**
+
 - Create: `apps/service/server/logger.ts`
 - Test: `apps/service/test/logger.test.ts`
 
@@ -516,6 +518,7 @@ git commit -m "feat(service): add pino logger factory (metadata-only)"
 ## Task 5: Migration runner
 
 **Files:**
+
 - Create: `apps/service/server/db/migrate.ts`
 - Test: `apps/service/test/migrate.test.ts`
 
@@ -526,7 +529,11 @@ import { describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { runMigrations } from '../server/db/migrate.js';
 
-const M1 = { version: 1, name: 'create_widgets', sql: 'CREATE TABLE widgets (id INTEGER PRIMARY KEY);' };
+const M1 = {
+  version: 1,
+  name: 'create_widgets',
+  sql: 'CREATE TABLE widgets (id INTEGER PRIMARY KEY);',
+};
 
 describe('runMigrations', () => {
   it('applies pending migrations and records them', () => {
@@ -612,6 +619,7 @@ git commit -m "feat(service): add sqlite migration runner with _migrations track
 ## Task 6: Initial migration (all §6 tables) + schema types + migration registry
 
 **Files:**
+
 - Create: `apps/service/server/db/migrations/0001_init.sql`
 - Create: `apps/service/server/db/migrations/index.ts`
 - Create: `apps/service/server/db/schema.ts`
@@ -626,8 +634,16 @@ import { runMigrations } from '../server/db/migrate.js';
 import { migrations } from '../server/db/migrations/index.js';
 
 const TABLES = [
-  'accounts', 'messages', 'threads', 'contacts', 'drafts',
-  'follow_ups', 'action_log', 'settings', 'push_subscriptions', 'style_examples',
+  'accounts',
+  'messages',
+  'threads',
+  'contacts',
+  'drafts',
+  'follow_ups',
+  'action_log',
+  'settings',
+  'push_subscriptions',
+  'style_examples',
 ];
 
 describe('0001_init migration', () => {
@@ -918,6 +934,7 @@ git commit -m "feat(service): add 0001 init migration with all brief tables and 
 ## Task 7: connection.ts (SQLCipher open + key management) and seed.ts
 
 **Files:**
+
 - Create: `apps/service/server/db/seed.ts`
 - Create: `apps/service/server/db/connection.ts`
 - Test: `apps/service/test/connection.test.ts`
@@ -1057,6 +1074,7 @@ git commit -m "feat(service): open SQLCipher db with keychain key, run migration
 ## Task 8: SettingsRepository
 
 **Files:**
+
 - Create: `apps/service/server/db/repositories/SettingsRepository.ts`
 - Test: `apps/service/test/settings-repository.test.ts`
 
@@ -1172,6 +1190,7 @@ git commit -m "feat(service): add SettingsRepository with JSON get/getAll/set/pa
 ## Task 9: PushSubscriptionRepository
 
 **Files:**
+
 - Create: `apps/service/server/db/repositories/PushSubscriptionRepository.ts`
 - Test: `apps/service/test/push-repository.test.ts`
 
@@ -1295,6 +1314,7 @@ git commit -m "feat(service): add PushSubscriptionRepository (upsert/list/delete
 ## Task 10: GatewayClient + local fake-gateway integration test
 
 **Files:**
+
 - Create: `apps/service/server/llm/GatewayClient.ts`
 - Test: `apps/service/test/gateway-client.test.ts`
 
@@ -1303,7 +1323,12 @@ git commit -m "feat(service): add PushSubscriptionRepository (upsert/list/delete
 ```ts
 import { createServer, type Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { decryptJson, encryptJson, hexToKey, type EncryptedEnvelope } from '@secretary/shared-crypto';
+import {
+  decryptJson,
+  encryptJson,
+  hexToKey,
+  type EncryptedEnvelope,
+} from '@secretary/shared-crypto';
 import type { CompleteRequest, CompleteResponse } from '@secretary/llm-protocol';
 import { ENVELOPE_CONTENT_TYPE } from '@secretary/llm-protocol';
 import { createGatewayClient } from '../server/llm/GatewayClient.js';
@@ -1312,7 +1337,9 @@ const PAYLOAD_KEY = 'a'.repeat(64);
 const API_KEY = 'b'.repeat(64);
 
 /** A fake gateway that decrypts the request and returns an encrypted canned completion. */
-function startFakeGateway(onApiKey: (k: string | undefined) => void): Promise<{ url: string; server: Server }> {
+function startFakeGateway(
+  onApiKey: (k: string | undefined) => void,
+): Promise<{ url: string; server: Server }> {
   const key = hexToKey(PAYLOAD_KEY);
   const server = createServer((req, res) => {
     onApiKey(req.headers['x-api-key'] as string | undefined);
@@ -1456,6 +1483,7 @@ git commit -m "feat(service): add encrypted GatewayClient with config-driven CF 
 ## Task 11: SessionTokens (bootstrap + HMAC session tokens)
 
 **Files:**
+
 - Create: `apps/service/server/crypto/SessionTokens.ts`
 - Test: `apps/service/test/session-tokens.test.ts`
 
@@ -1546,7 +1574,10 @@ export class SessionTokens {
     return this.bootstrap;
   }
 
-  exchangeBootstrap(token: string, ttlSeconds = DEFAULT_TTL_SECONDS): { token: string; expiresAt: number } {
+  exchangeBootstrap(
+    token: string,
+    ttlSeconds = DEFAULT_TTL_SECONDS,
+  ): { token: string; expiresAt: number } {
     if (!this.bootstrap) throw new AuthError('Bootstrap token already used');
     const a = Buffer.from(token);
     const b = Buffer.from(this.bootstrap);
@@ -1574,7 +1605,9 @@ export class SessionTokens {
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
     try {
-      const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { exp: number };
+      const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+        exp: number;
+      };
       return typeof exp === 'number' && exp > this.now();
     } catch {
       return false;
@@ -1605,6 +1638,7 @@ git commit -m "feat(service): add bootstrap + HMAC session token issuance and va
 ## Task 12: eventBus + Fastify server factory (envelope, CORS, auth guard, health)
 
 **Files:**
+
 - Create: `apps/service/server/eventBus.ts`
 - Create: `apps/service/server/server.ts`
 - Test: `apps/service/test/server-core.test.ts`
@@ -1784,6 +1818,7 @@ git commit -m "feat(service): add Fastify server factory with CORS, auth guard, 
 ## Task 13: Auth routes (bootstrap→session exchange, revoke)
 
 **Files:**
+
 - Create: `apps/service/server/api/auth.ts`
 - Modify: `apps/service/server/server.ts` (register the routes)
 - Test: `apps/service/test/auth-routes.test.ts`
@@ -1900,7 +1935,7 @@ import { registerAuthRoutes } from './api/auth.js';
 Inside the `app.register(async (api) => { ... }, { prefix: '/api/v1' })` body, replace the `// registerAuthRoutes(...)` comment with:
 
 ```ts
-      registerAuthRoutes(api, deps);
+registerAuthRoutes(api, deps);
 ```
 
 - [ ] **Step 6: Run test to verify it passes**
@@ -1920,6 +1955,7 @@ git commit -m "feat(service): add auth/session bootstrap-exchange and revoke rou
 ## Task 14: Settings routes
 
 **Files:**
+
 - Create: `apps/service/server/api/settings.ts`
 - Modify: `apps/service/server/server.ts`
 - Test: `apps/service/test/settings-routes.test.ts`
@@ -1996,7 +2032,7 @@ import { registerSettingsRoutes } from './api/settings.js';
 In the prefixed register body, add:
 
 ```ts
-      registerSettingsRoutes(api, deps);
+registerSettingsRoutes(api, deps);
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -2016,6 +2052,7 @@ git commit -m "feat(service): add settings GET/PATCH routes"
 ## Task 15: Push routes
 
 **Files:**
+
 - Create: `apps/service/server/api/push.ts`
 - Modify: `apps/service/server/server.ts`
 - Test: `apps/service/test/push-routes.test.ts`
@@ -2117,7 +2154,7 @@ import { registerPushRoutes } from './api/push.js';
 In the prefixed register body, add:
 
 ```ts
-      registerPushRoutes(api, deps);
+registerPushRoutes(api, deps);
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -2137,6 +2174,7 @@ git commit -m "feat(service): add push subscribe/unsubscribe routes and stubbed 
 ## Task 16: SSE events route
 
 **Files:**
+
 - Create: `apps/service/server/api/events.ts`
 - Modify: `apps/service/server/server.ts`
 - Test: `apps/service/test/events-route.test.ts`
@@ -2229,7 +2267,7 @@ import { registerEventRoutes } from './api/events.js';
 In the prefixed register body, add:
 
 ```ts
-      registerEventRoutes(api, deps);
+registerEventRoutes(api, deps);
 ```
 
 - [ ] **Step 5: Run test to verify it passes (with the short close window)**
@@ -2250,6 +2288,7 @@ git commit -m "feat(service): add SSE events route with heartbeat fed by the eve
 ## Task 17: First-run setup detection
 
 **Files:**
+
 - Create: `apps/service/server/setup/firstRun.ts`
 - Test: `apps/service/test/first-run.test.ts`
 
@@ -2352,6 +2391,7 @@ git commit -m "feat(service): add first-run setup detection with needs-setup fla
 ## Task 18: httpsOptions, placeholder PWA page, headless entrypoint
 
 **Files:**
+
 - Create: `apps/service/server/httpsOptions.ts`
 - Create: `apps/service/pwa/index.html`
 - Create: `apps/service/server/index.ts`
@@ -2376,9 +2416,7 @@ afterEach(() => {
 
 describe('loadHttpsOptions', () => {
   it('throws a helpful error when certs are missing', () => {
-    expect(() => loadHttpsOptions(join(dir, 'x.pem'), join(dir, 'x-key.pem'))).toThrow(
-      /mkcert/,
-    );
+    expect(() => loadHttpsOptions(join(dir, 'x.pem'), join(dir, 'x-key.pem'))).toThrow(/mkcert/);
   });
 
   it('loads cert and key buffers when present', () => {
@@ -2567,6 +2605,7 @@ git commit -m "feat(service): add HTTPS entrypoint, static placeholder page, fir
 ## Task 19: mkcert dev cert script + manual headless run
 
 **Files:**
+
 - Create: `infra/mkcert/setup-certs.ps1`
 - Modify: `infra/mkcert/README.md`
 
@@ -2635,7 +2674,10 @@ const client = createGatewayClient({
   apiKey: store.get('app.gateway-api-key') ?? '',
   payloadKey: store.get('app.payload-key') ?? '',
 });
-const out = await client.complete({ model: 'qwen2.5:14b-instruct-q5_K_M', prompt: 'Say hi in 3 words.' });
+const out = await client.complete({
+  model: 'qwen2.5:14b-instruct-q5_K_M',
+  prompt: 'Say hi in 3 words.',
+});
 console.log(out);
 ```
 
@@ -2654,6 +2696,7 @@ git commit -m "chore(service): add mkcert dev cert script and manual gateway rou
 ## Task 20: Electron tray shell (supervises the server child)
 
 **Files:**
+
 - Create: `apps/service/electron/server-process.ts`
 - Create: `apps/service/electron/tray-menu.ts`
 - Create: `apps/service/electron/main.ts`
@@ -2678,7 +2721,10 @@ export interface ServerHandle {
 /** Forks the headless server (built JS), resolving once it signals readiness. */
 export function startServer(): Promise<ServerHandle> {
   const entry = join(here, '..', 'server', 'index.js');
-  const child = fork(entry, [], { env: process.env, stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
+  const child = fork(entry, [], {
+    env: process.env,
+    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+  });
 
   return new Promise<ServerHandle>((resolve, reject) => {
     const onMessage = (msg: unknown): void => {
@@ -2768,10 +2814,13 @@ async function bootstrap(): Promise<void> {
   refresh();
 }
 
-app.whenReady().then(bootstrap).catch((err) => {
-  console.error(err);
-  app.quit();
-});
+app
+  .whenReady()
+  .then(bootstrap)
+  .catch((err) => {
+    console.error(err);
+    app.quit();
+  });
 
 app.on('window-all-closed', () => {
   /* tray-only app: do not quit when no windows */
@@ -2789,6 +2838,7 @@ app.on('before-quit', () => {
 Create `apps/service/electron/tray-icon.png` — any small (32×32) PNG works for v1. Generate a solid square if none is handy:
 
 Run (PowerShell):
+
 ```powershell
 $bytes = [Convert]::FromBase64String("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAHElEQVRYhe3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAvwYwAAFm2Z3qAAAAAElFTkSuQmCC")
 [IO.File]::WriteAllBytes("apps/service/electron/tray-icon.png", $bytes)

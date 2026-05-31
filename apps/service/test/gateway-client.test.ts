@@ -1,6 +1,11 @@
 import { createServer, type Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { decryptJson, encryptJson, hexToKey, type EncryptedEnvelope } from '@secretary/shared-crypto';
+import {
+  decryptJson,
+  encryptJson,
+  hexToKey,
+  type EncryptedEnvelope,
+} from '@secretary/shared-crypto';
 import type { CompleteRequest, CompleteResponse } from '@secretary/llm-protocol';
 import { ENVELOPE_CONTENT_TYPE } from '@secretary/llm-protocol';
 import { UpstreamError } from '@secretary/shared-types';
@@ -10,7 +15,9 @@ const PAYLOAD_KEY = 'a'.repeat(64);
 const API_KEY = 'b'.repeat(64);
 
 /** A fake gateway that decrypts the request and returns an encrypted canned completion. */
-function startFakeGateway(onApiKey: (k: string | undefined) => void): Promise<{ url: string; server: Server }> {
+function startFakeGateway(
+  onApiKey: (k: string | undefined) => void,
+): Promise<{ url: string; server: Server }> {
   const key = hexToKey(PAYLOAD_KEY);
   const server = createServer((req, res) => {
     onApiKey(req.headers['x-api-key'] as string | undefined);
@@ -77,7 +84,9 @@ describe('GatewayClient', () => {
       apiKey: API_KEY,
       payloadKey: PAYLOAD_KEY,
     });
-    await expect(client.complete({ model: 'm', prompt: 'x' })).rejects.toBeInstanceOf(UpstreamError);
+    await expect(client.complete({ model: 'm', prompt: 'x' })).rejects.toBeInstanceOf(
+      UpstreamError,
+    );
     expect(calls).toBe(1);
   });
 
@@ -135,6 +144,8 @@ describe('GatewayClient', () => {
       apiKey: API_KEY,
       payloadKey: PAYLOAD_KEY,
     });
-    await expect(client.complete({ model: 'm', prompt: 'x' })).rejects.toBeInstanceOf(UpstreamError);
+    await expect(client.complete({ model: 'm', prompt: 'x' })).rejects.toBeInstanceOf(
+      UpstreamError,
+    );
   });
 });

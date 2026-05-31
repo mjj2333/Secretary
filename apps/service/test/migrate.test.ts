@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { runMigrations } from '../server/db/migrate.js';
 
-const M1 = { version: 1, name: 'create_widgets', sql: 'CREATE TABLE widgets (id INTEGER PRIMARY KEY);' };
+const M1 = {
+  version: 1,
+  name: 'create_widgets',
+  sql: 'CREATE TABLE widgets (id INTEGER PRIMARY KEY);',
+};
 
 describe('runMigrations', () => {
   it('applies pending migrations and records them', () => {

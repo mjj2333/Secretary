@@ -20,7 +20,9 @@ export interface TestServer {
 }
 
 /** Builds a fully-wired server against a temp encrypted DB and an in-memory secret store. */
-export async function makeTestServer(opts: { consumeBootstrap?: boolean; pwaDir?: string } = {}): Promise<TestServer> {
+export async function makeTestServer(
+  opts: { consumeBootstrap?: boolean; pwaDir?: string } = {},
+): Promise<TestServer> {
   const dir = mkdtempSync(join(tmpdir(), 'secretary-srv-'));
   const store = new InMemorySecretStore();
   const db = openDatabase(join(dir, 'secretary.db'), store);
@@ -38,6 +40,7 @@ export async function makeTestServer(opts: { consumeBootstrap?: boolean; pwaDir?
   // Capture the bootstrap token before (optionally) consuming it.
   const bootstrap = sessions.currentBootstrapToken();
   // A valid bearer token for protected-route tests (default: consume bootstrap).
-  const session = (opts.consumeBootstrap ?? true) ? sessions.exchangeBootstrap(bootstrap).token : '';
+  const session =
+    (opts.consumeBootstrap ?? true) ? sessions.exchangeBootstrap(bootstrap).token : '';
   return { app, store, db, sessions, eventBus, session, bootstrap };
 }

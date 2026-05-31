@@ -33,7 +33,10 @@ const PUBLIC_ROUTES = new Set(['GET /api/v1/health', 'POST /api/v1/auth/session'
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app: FastifyInstance = deps.https
-    ? (Fastify({ logger: false, https: { cert: deps.https.cert, key: deps.https.key } }) as unknown as FastifyInstance)
+    ? (Fastify({
+        logger: false,
+        https: { cert: deps.https.cert, key: deps.https.key },
+      }) as unknown as FastifyInstance)
     : Fastify({ logger: false });
 
   app.register(cors, { origin: deps.origin, credentials: true });

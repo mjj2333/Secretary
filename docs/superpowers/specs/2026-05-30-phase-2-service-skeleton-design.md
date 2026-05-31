@@ -25,6 +25,7 @@ The product remains **cross-platform** (macOS + Windows per brief §3). **Window
 ## Goals (this phase)
 
 Deliver a runnable principal service that:
+
 1. Starts as an Electron tray app (no `BrowserWindow`) on Windows, with menu: Open Secretary, Pause/Resume, View Logs, Quit.
 2. Serves a Fastify HTTPS server (mkcert cert) that responds at `https://localhost:<port>` with a placeholder page.
 3. Creates and opens a SQLCipher-encrypted database, runs migrations that lay down all §6 tables, and seeds settings defaults.
@@ -108,6 +109,7 @@ When packaged, Electron forks the server using its bundled Node (`ELECTRON_RUN_A
 ### config.ts
 
 Reads from env with defaults. Non-secret config only (secrets come from keychain; tunable settings come from the DB).
+
 - `SERVICE_PORT` — default `47824` (gateway uses `47823`).
 - `SERVICE_DATA_DIR` — default OS userData dir; holds `secretary.db`, logs, bootstrap-token file, needs-setup flag.
 - `SERVICE_CERT_PATH` / `SERVICE_KEY_PATH` — mkcert cert/key paths; default to dev cert dir in dev, userData in packaged.
@@ -148,6 +150,7 @@ Reads from env with defaults. Non-secret config only (secrets come from keychain
 ### API surface (Phase 2 subset of §9)
 
 Mounted under `/api/v1`. All routes except `health` require `Authorization: Bearer <session>` and strict CORS to the served origin. Success → `{ data }`, failure → `{ error: { code, message } }` (brief §16).
+
 - `GET /api/v1/health` — unauth; `{ data: { ok, version } }`.
 - `POST /api/v1/auth/session` / `DELETE /api/v1/auth/session`.
 - `GET /api/v1/settings` (all) / `PATCH /api/v1/settings` (partial merge).
@@ -182,6 +185,7 @@ Mounted under `/api/v1`. All routes except `health` require `Authorization: Bear
 ## Testing strategy
 
 Vitest in `apps/service`. Coverage target 60% (apps) per brief §16.
+
 - **db:** migration runner applies all migrations and is idempotent; SQLCipher wrong-key open fails; `SettingsRepository` get/set/patch round-trips; `PushSubscriptionRepository` insert/list/delete.
 - **GatewayClient:** end-to-end round-trip against a local fake gateway (encrypt → decrypt → respond → decrypt); typed error on failure; one-retry behavior.
 - **auth:** bootstrap→session exchange, single-use bootstrap, session validation + expiry, revoke.
@@ -191,17 +195,20 @@ UI (tray, placeholder page) is manually verified on Windows per brief §16.
 
 ## Acceptance criteria (brief §14 Phase 2) → how met
 
-| Criterion | Met by |
-|---|---|
-| `pnpm dev` starts Electron tray + Fastify HTTPS server | `electron/main.ts` + `server-process.ts` fork; manual check |
-| Tray icon appears (Windows) | Tray created in `main.ts`; manual check |
-| `https://localhost:<port>` hits server (placeholder) | `pwa/index.html` served over mkcert HTTPS |
-| DB file encrypted (open without key fails) | SQLCipher + wrong-key test |
-| `GatewayClient` works end-to-end with test prompts | Local fake-gateway integration test + manual round-trip against local gateway |
+| Criterion                                              | Met by                                                                        |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `pnpm dev` starts Electron tray + Fastify HTTPS server | `electron/main.ts` + `server-process.ts` fork; manual check                   |
+| Tray icon appears (Windows)                            | Tray created in `main.ts`; manual check                                       |
+| `https://localhost:<port>` hits server (placeholder)   | `pwa/index.html` served over mkcert HTTPS                                     |
+| DB file encrypted (open without key fails)             | SQLCipher + wrong-key test                                                    |
+| `GatewayClient` works end-to-end with test prompts     | Local fake-gateway integration test + manual round-trip against local gateway |
 
 ## Risks & mitigations
 
 - **Native module / Electron ABI on Windows** — verify load first; `dev:server` (plain Node) unblocks core work; `rebuild:electron` handled before the `pnpm dev` acceptance check.
 - **mkcert not installed** — `setup-certs.ps1` runs `mkcert -install`; server gives a clear error if cert paths are missing.
 - **Bootstrap token leakage via URL fragment** — single-use, short-lived, never sent to the server in query (fragment stays client-side until the explicit exchange POST); cleared after exchange.
+
+```
+
 ```

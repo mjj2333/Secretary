@@ -8,3 +8,4 @@ allowBuilds:
   better-sqlite3-multiple-ciphers: true
   electron: true
   esbuild: true
+  unrs-resolver: set this to true or false

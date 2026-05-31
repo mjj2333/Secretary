@@ -66,7 +66,11 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
 
       const envelope = encryptedEnvelopeSchema.safeParse(raw);
       if (!envelope.success) {
-        throw new UpstreamError('gateway_bad_response', 'Gateway returned a malformed envelope', 502);
+        throw new UpstreamError(
+          'gateway_bad_response',
+          'Gateway returned a malformed envelope',
+          502,
+        );
       }
 
       let decoded: unknown;
@@ -80,7 +84,11 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
 
       const parsed = completeResponseSchema.safeParse(decoded);
       if (!parsed.success) {
-        throw new UpstreamError('gateway_bad_response', 'Gateway returned a malformed completion', 502);
+        throw new UpstreamError(
+          'gateway_bad_response',
+          'Gateway returned a malformed completion',
+          502,
+        );
       }
       return parsed.data;
     },

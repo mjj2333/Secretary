@@ -16,9 +16,7 @@ const envSchema = z.object({
   SERVICE_KEY_PATH: z.string().optional(),
   GATEWAY_URL: z.string().url().default('http://localhost:47823'),
   GATEWAY_USE_CF_HEADERS: boolFlag.default('false'),
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-    .default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   LOG_PRETTY: boolFlag.default('false'),
 });
 

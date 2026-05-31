@@ -38,7 +38,10 @@ export class SessionTokens {
     return this.bootstrap;
   }
 
-  exchangeBootstrap(token: string, ttlSeconds = DEFAULT_TTL_SECONDS): { token: string; expiresAt: number } {
+  exchangeBootstrap(
+    token: string,
+    ttlSeconds = DEFAULT_TTL_SECONDS,
+  ): { token: string; expiresAt: number } {
     if (!this.bootstrap) throw new AuthError('Bootstrap token already used');
     const a = Buffer.from(token);
     const b = Buffer.from(this.bootstrap);
@@ -66,7 +69,9 @@ export class SessionTokens {
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
     try {
-      const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { exp: number };
+      const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+        exp: number;
+      };
       return typeof exp === 'number' && exp > this.now();
     } catch {
       return false;

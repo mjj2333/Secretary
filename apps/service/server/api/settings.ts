@@ -3,7 +3,10 @@ import type Database from 'better-sqlite3-multiple-ciphers';
 import { ValidationError } from '@secretary/shared-types';
 import { SettingsRepository } from '../db/repositories/SettingsRepository.js';
 
-export function registerSettingsRoutes(app: FastifyInstance, deps: { db: Database.Database }): void {
+export function registerSettingsRoutes(
+  app: FastifyInstance,
+  deps: { db: Database.Database },
+): void {
   const repo = new SettingsRepository(deps.db);
 
   app.get('/settings', async () => ({ data: repo.getAll() }));
