@@ -1,15 +1,31 @@
 import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3-multiple-ciphers';
+import { z } from 'zod';
 import {
   NotFoundError,
+  ValidationError,
   type EmailAddress,
   type MessageView,
+  type NeedsAttentionItem,
+  type ThreadState,
   type ThreadSummary,
   type ThreadWithMessages,
 } from '@secretary/shared-types';
-import { ThreadsRepository } from '../db/repositories/ThreadsRepository.js';
+import { ThreadsRepository, type AttentionRow } from '../db/repositories/ThreadsRepository.js';
 import { MessagesRepository } from '../db/repositories/MessagesRepository.js';
 import type { MessageRow, ThreadRow } from '../db/schema.js';
+
+const stateBodySchema = z.object({
+  state: z.enum([
+    'needs_classification',
+    'awaiting_their_reply',
+    'awaiting_your_reply',
+    'closed',
+    'scheduled_followup',
+    'informational',
+  ]),
+  reason: z.string().optional(),
+});
 
 function parseAddrs(json: string | null): EmailAddress[] {
   if (!json) return [];
@@ -32,6 +48,16 @@ function threadSummary(row: ThreadRow): ThreadSummary {
   };
 }
 
+function needsAttentionItem(row: AttentionRow): NeedsAttentionItem {
+  return {
+    ...threadSummary(row),
+    urgency: row.urgency,
+    slaDeadline: row.sla_deadline ? new Date(row.sla_deadline).toISOString() : null,
+    summary: row.last_agent_summary,
+    hasPendingFollowUp: row.has_pending === 1,
+  };
+}
+
 function messageView(row: MessageRow): MessageView {
   return {
     id: row.id,
@@ -48,9 +74,19 @@ function messageView(row: MessageRow): MessageView {
   };
 }
 
-export function registerThreadsRoutes(app: FastifyInstance, deps: { db: Database.Database }): void {
+export interface ThreadsRouteDeps {
+  db: Database.Database;
+  classificationQueue: { enqueue(messageId: string): void };
+  stateMachine: { onManual(threadId: string, state: ThreadState, reason?: string): void };
+}
+
+export function registerThreadsRoutes(app: FastifyInstance, deps: ThreadsRouteDeps): void {
   const threads = new ThreadsRepository(deps.db);
   const messages = new MessagesRepository(deps.db);
+
+  app.get('/threads/needs-attention', async () => ({
+    data: threads.needsAttention().map(needsAttentionItem),
+  }));
 
   app.get('/threads', async (req) => {
     const q = req.query as { accountId?: string; limit?: string; offset?: string };
@@ -73,5 +109,25 @@ export function registerThreadsRoutes(app: FastifyInstance, deps: { db: Database
       messages: messages.listByThread(id).map(messageView),
     };
     return { data: view };
+  });
+
+  app.post('/threads/:id/state', async (req) => {
+    const { id } = req.params as { id: string };
+    const parsed = stateBodySchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError('Invalid state');
+    // onManual throws NotFoundError internally if the thread is missing.
+    deps.stateMachine.onManual(id, parsed.data.state, parsed.data.reason);
+    const updated = threads.get(id);
+    if (!updated) throw new NotFoundError('Thread not found');
+    return { data: threadSummary(updated) };
+  });
+
+  app.post('/threads/:id/classify', async (req) => {
+    const { id } = req.params as { id: string };
+    if (!threads.get(id)) throw new NotFoundError('Thread not found');
+    const latest = messages.latestInboundForThread(id);
+    if (!latest) throw new ValidationError('No inbound message to classify');
+    deps.classificationQueue.enqueue(latest.id);
+    return { data: { queued: true } };
   });
 }

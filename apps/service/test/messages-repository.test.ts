@@ -2,10 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RawMessage } from '@secretary/shared-types';
+import type { RawMessage, MessageDirection } from '@secretary/shared-types';
 import { InMemorySecretStore } from '../server/auth/SecretStore.js';
 import { openDatabase } from '../server/db/connection.js';
 import { MessagesRepository } from '../server/db/repositories/MessagesRepository.js';
+import { ThreadsRepository } from '../server/db/repositories/ThreadsRepository.js';
 
 let dir: string;
 beforeEach(() => {
@@ -15,47 +16,76 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-function seed(db: ReturnType<typeof openDatabase>) {
-  db.prepare(
-    `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','a@b.com')`,
-  ).run();
-  db.prepare(
-    `INSERT INTO threads (id, account_id, state) VALUES ('th1','acc1','needs_classification')`,
-  ).run();
+function raw(uid: string, direction: MessageDirection, when: number): RawMessage {
+  return {
+    providerId: uid,
+    references: [],
+    from: direction === 'inbound' ? { address: 'a@b.com' } : { address: 'me@b.com' },
+    to: [{ address: direction === 'inbound' ? 'me@b.com' : 'a@b.com' }],
+    cc: [],
+    bcc: [],
+    subject: 'hello',
+    bodyText: 'hi',
+    direction,
+    ...(direction === 'inbound' ? { dateReceived: when } : { dateSent: when }),
+    isRead: false,
+    isStarred: false,
+    folder: direction === 'inbound' ? 'INBOX' : 'Sent',
+    labels: [],
+    attachmentsMeta: [],
+  };
 }
 
-const raw: RawMessage = {
-  providerId: 'uid-1',
-  messageIdHeader: '<m1@x>',
-  references: [],
-  from: { address: 'a@b.com', name: 'A' },
-  to: [{ address: 'c@d.com' }],
-  cc: [],
-  bcc: [],
-  subject: 'Hi',
-  bodyText: 'hello',
-  snippet: 'hello',
-  direction: 'inbound',
-  dateReceived: 1000,
-  isRead: false,
-  isStarred: false,
-  folder: 'INBOX',
-  labels: [],
-  attachmentsMeta: [],
-};
-
 describe('MessagesRepository', () => {
-  it('inserts a message and is idempotent on (account_id, provider_id)', () => {
+  it('insert returns the new id and is idempotent on (account_id, provider_id)', () => {
     const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
-    seed(db);
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','a@b.com')`,
+    ).run();
+    const threads = new ThreadsRepository(db);
+    const threadId = threads.create('acc1', 'hello', ['a@b.com'], 1000);
     const repo = new MessagesRepository(db);
-    const first = repo.insert('acc1', 'th1', raw);
-    const second = repo.insert('acc1', 'th1', raw); // duplicate provider_id
-    const list = repo.listByThread('th1');
+
+    const id = repo.insert('acc1', threadId, raw('u1', 'inbound', 1000));
+    expect(id).toMatch(/[0-9a-f-]{36}/);
+    const again = repo.insert('acc1', threadId, raw('u1', 'inbound', 1000)); // duplicate provider_id
     db.close();
-    expect(first).toBe(true);
-    expect(second).toBe(false);
-    expect(list).toHaveLength(1);
-    expect(list[0]?.message_id_header).toBe('<m1@x>');
+    expect(again).toBeNull();
+  });
+
+  it('listByThread orders mixed inbound/outbound messages chronologically', () => {
+    const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','a@b.com')`,
+    ).run();
+    const threads = new ThreadsRepository(db);
+    const threadId = threads.create('acc1', 'hello', ['a@b.com'], 1000);
+    const repo = new MessagesRepository(db);
+    // Insert out of order; an outbound (date_sent only) sits chronologically in the middle.
+    const third = repo.insert('acc1', threadId, raw('u3', 'inbound', 3000))!;
+    const first = repo.insert('acc1', threadId, raw('u1', 'inbound', 1000))!;
+    const second = repo.insert('acc1', threadId, raw('u2', 'outbound', 2000))!;
+    const ordered = repo.listByThread(threadId).map((m) => m.id);
+    db.close();
+    expect(ordered).toEqual([first, second, third]);
+  });
+
+  it('getById, latestForThread, latestInboundForThread', () => {
+    const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','a@b.com')`,
+    ).run();
+    const threads = new ThreadsRepository(db);
+    const threadId = threads.create('acc1', 'hello', ['a@b.com'], 1000);
+    const repo = new MessagesRepository(db);
+
+    const inId = repo.insert('acc1', threadId, raw('u1', 'inbound', 1000))!;
+    const outId = repo.insert('acc1', threadId, raw('u2', 'outbound', 2000))!;
+
+    expect(repo.getById(inId)?.id).toBe(inId);
+    expect(repo.getById('nope')).toBeUndefined();
+    expect(repo.latestForThread(threadId)?.id).toBe(outId); // newest overall
+    expect(repo.latestInboundForThread(threadId)?.id).toBe(inId); // newest inbound
+    db.close();
   });
 });

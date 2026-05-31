@@ -122,3 +122,15 @@ export interface ActionLogRow {
   target_id: string | null;
   details: string | null;
 }
+
+export interface FollowUpRow {
+  id: string;
+  thread_id: string;
+  trigger_at: number;
+  reason: 'sla_breach' | 'scheduled_reminder' | 'awaiting_response' | 'manual_pin';
+  description: string | null;
+  status: 'pending' | 'surfaced' | 'dismissed' | 'resolved';
+  created_at: number | null;
+  surfaced_at: number | null;
+  resolved_at: number | null;
+}

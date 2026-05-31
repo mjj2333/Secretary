@@ -6,7 +6,7 @@
   "main": "./dist/electron/main.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && node -e \"const {cpSync}=require('node:fs');cpSync('server/db/migrations','dist/server/db/migrations',{recursive:true,filter:(s)=>!s.endsWith('.ts')});cpSync('pwa','dist/pwa',{recursive:true});cpSync('electron/tray-icon.png','dist/electron/tray-icon.png')\"",
+    "build": "tsc -p tsconfig.json && node -e \"const {cpSync}=require('node:fs');cpSync('server/db/migrations','dist/server/db/migrations',{recursive:true,filter:(s)=>!s.endsWith('.ts')});cpSync('server/prompts','dist/server/prompts',{recursive:true});cpSync('pwa','dist/pwa',{recursive:true});cpSync('electron/tray-icon.png','dist/electron/tray-icon.png')\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

@@ -6,27 +6,42 @@ import { ContactsRepository } from '../db/repositories/ContactsRepository.js';
 import { ThreadsRepository } from '../db/repositories/ThreadsRepository.js';
 import { MessagesRepository } from '../db/repositories/MessagesRepository.js';
 import { ActionLogRepository } from '../db/repositories/ActionLogRepository.js';
+import { SettingsRepository } from '../db/repositories/SettingsRepository.js';
 import { resolveThreadId, normalizeSubject } from './threading.js';
 import { participantsOf } from './normalize.js';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Side-effects fired after a thread's newest message is persisted. */
+export interface SyncHooks {
+  enqueueClassification(messageId: string): void;
+  onOutbound(threadId: string): void;
+}
+
+const NOOP_HOOKS: SyncHooks = {
+  enqueueClassification() {},
+  onOutbound() {},
+};
 
 export class SyncManager {
   private readonly contacts: ContactsRepository;
   private readonly threads: ThreadsRepository;
   private readonly messages: MessagesRepository;
   private readonly actions: ActionLogRepository;
+  private readonly settings: SettingsRepository;
 
   constructor(
     private readonly db: Database.Database,
     private readonly registry: ProviderRegistry,
     private readonly eventBus: EventBus,
     private readonly now: () => number = Date.now,
+    private readonly hooks: SyncHooks = NOOP_HOOKS,
   ) {
     this.contacts = new ContactsRepository(db);
     this.threads = new ThreadsRepository(db);
     this.messages = new MessagesRepository(db);
     this.actions = new ActionLogRepository(db);
+    this.settings = new SettingsRepository(db);
   }
 
   /**
@@ -72,15 +87,23 @@ export class SyncManager {
   }
 
   /**
-   * Persists a batch best-effort: a single bad message is recorded in the action
-   * log and skipped — it never aborts the batch (so a poison message can't break
-   * the whole account's sync). Returns true if any message was newly persisted.
+   * Persists a batch best-effort (a poison message is logged and skipped), in
+   * chronological order so thread aggregates settle correctly, then routes each
+   * touched thread by its newest message to the right side-effect.
    */
   private persistBatch(accountId: string, msgs: RawMessage[]): boolean {
+    const sorted = [...msgs].sort(
+      (a, b) => (a.dateReceived ?? a.dateSent ?? 0) - (b.dateReceived ?? b.dateSent ?? 0),
+    );
+    const touched = new Set<string>();
     let any = false;
-    for (const raw of msgs) {
+    for (const raw of sorted) {
       try {
-        if (this.persist(accountId, raw)) any = true;
+        const threadId = this.persist(accountId, raw);
+        if (threadId) {
+          any = true;
+          touched.add(threadId);
+        }
       } catch {
         try {
           this.actions.append({
@@ -94,18 +117,41 @@ export class SyncManager {
         }
       }
     }
+    for (const threadId of touched) {
+      // Routing fires the agent hooks (classify enqueue / outbound state change). A throw here
+      // must not abort the batch's markSynced/emit — isolate it per thread (fire-and-forget contract).
+      try {
+        this.route(threadId);
+      } catch (err) {
+        console.error(
+          `[secretary] post-sync routing failed (thread ${threadId}):`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     return any;
   }
 
+  /** Routes the thread by its newest message: outbound -> state change; inbound -> classify. */
+  private route(threadId: string): void {
+    const latest = this.messages.latestForThread(threadId);
+    if (!latest) return;
+    if (latest.direction === 'outbound') {
+      this.hooks.onOutbound(threadId);
+      return;
+    }
+    if (this.settings.get<boolean>('agent.classify_on_inbound') !== false) {
+      this.hooks.enqueueClassification(latest.id);
+    }
+  }
+
   /**
-   * Persists one new message (contact + thread + message + action log) in a
-   * transaction. Skips entirely (no writes) if the message already exists, so
-   * re-syncs don't double-count contacts or orphan threads. Returns whether it
-   * persisted anything.
+   * Persists one new message in a transaction. Skips entirely if it already
+   * exists. Returns the thread id it was persisted into, or null if nothing changed.
    */
-  private persist(accountId: string, raw: RawMessage): boolean {
+  private persist(accountId: string, raw: RawMessage): string | null {
     const when = raw.dateReceived ?? raw.dateSent ?? this.now();
-    let changed = false;
+    let result: string | null = null;
     const tx = this.db.transaction(() => {
       if (this.messages.existsByProviderId(accountId, raw.providerId)) return;
       this.contacts.recordSeen(raw.from, raw.direction, when);
@@ -132,10 +178,10 @@ export class SyncManager {
         targetId: raw.providerId,
         details: { direction: raw.direction, folder: raw.folder },
       });
-      changed = true;
+      result = threadId;
     });
     tx();
-    return changed;
+    return result;
   }
 
   private markSynced(accountId: string): void {

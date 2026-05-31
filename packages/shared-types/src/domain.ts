@@ -100,3 +100,42 @@ export interface ThreadSummary {
 export interface ThreadWithMessages extends ThreadSummary {
   messages: MessageView[];
 }
+
+export type ClassificationIntent =
+  | 'inquiry'
+  | 'booking_request'
+  | 'scheduling'
+  | 'chitchat'
+  | 'question'
+  | 'complaint'
+  | 'other';
+
+/** The validated result of classifying one inbound message (BRIEF §11). */
+export interface ClassificationResult {
+  intent: ClassificationIntent;
+  category_suggestion: ContactCategory;
+  urgency: Urgency;
+  requires_response: boolean;
+  summary: string;
+}
+
+/** A row on the Needs Attention screen (BRIEF §9 / §12). */
+export interface NeedsAttentionItem extends ThreadSummary {
+  urgency: Urgency | null;
+  slaDeadline: string | null;
+  summary: string | null;
+  hasPendingFollowUp: boolean;
+}
+
+/** Contact as returned by the contacts API (ISO dates per §16). */
+export interface ContactView {
+  id: string;
+  emailAddress: string;
+  displayName: string | null;
+  category: ContactCategory;
+  notes: string | null;
+  doNotAutoDraft: boolean;
+  totalMessagesIn: number;
+  totalMessagesOut: number;
+  lastContactAt: string | null;
+}

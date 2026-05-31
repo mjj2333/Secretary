@@ -6,8 +6,9 @@ import type { MessageRow } from '../schema.js';
 export class MessagesRepository {
   constructor(private readonly db: Database.Database) {}
 
-  /** Inserts a message; returns false (no-op) if (account_id, provider_id) already exists. */
-  insert(accountId: string, threadId: string, raw: RawMessage): boolean {
+  /** Inserts a message; returns its new id, or null if (account_id, provider_id) already exists. */
+  insert(accountId: string, threadId: string, raw: RawMessage): string | null {
+    const id = randomUUID();
     const info = this.db
       .prepare(
         `INSERT OR IGNORE INTO messages
@@ -18,7 +19,7 @@ export class MessagesRepository {
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
-        randomUUID(),
+        id,
         accountId,
         raw.providerId,
         threadId,
@@ -45,7 +46,7 @@ export class MessagesRepository {
         raw.rawSizeBytes ?? null,
         Date.now(),
       );
-    return info.changes > 0;
+    return info.changes > 0 ? id : null;
   }
 
   existsByProviderId(accountId: string, providerId: string): boolean {
@@ -55,9 +56,36 @@ export class MessagesRepository {
     return row !== undefined;
   }
 
+  getById(id: string): MessageRow | undefined {
+    return this.db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MessageRow | undefined;
+  }
+
+  /** All messages in a thread, oldest first (by received-or-sent time, so inbound and outbound interleave correctly). */
   listByThread(threadId: string): MessageRow[] {
     return this.db
-      .prepare('SELECT * FROM messages WHERE thread_id = ? ORDER BY COALESCE(date_received, 0) ASC')
+      .prepare(
+        'SELECT * FROM messages WHERE thread_id = ? ORDER BY COALESCE(date_received, date_sent, 0) ASC',
+      )
       .all(threadId) as MessageRow[];
+  }
+
+  /** Newest message in the thread by received-or-sent time. */
+  latestForThread(threadId: string): MessageRow | undefined {
+    return this.db
+      .prepare(
+        `SELECT * FROM messages WHERE thread_id = ?
+         ORDER BY COALESCE(date_received, date_sent, 0) DESC LIMIT 1`,
+      )
+      .get(threadId) as MessageRow | undefined;
+  }
+
+  /** Newest inbound message in the thread (the one a classifier should look at). */
+  latestInboundForThread(threadId: string): MessageRow | undefined {
+    return this.db
+      .prepare(
+        `SELECT * FROM messages WHERE thread_id = ? AND direction = 'inbound'
+         ORDER BY COALESCE(date_received, date_sent, 0) DESC LIMIT 1`,
+      )
+      .get(threadId) as MessageRow | undefined;
   }
 }

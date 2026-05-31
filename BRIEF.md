@@ -730,6 +730,13 @@ Calls `GatewayClient.complete()` with `format: 'json'`, validates against schema
 
 On success, applies state transition rules in §11.1, updates the thread row, writes `action_log` entry.
 
+**Phase 4 implementation notes (refinements to the above):**
+
+- Classification is keyed **per thread, by the thread's latest message**, not per inbound message. After a sync batch, each touched thread is routed once by its newest message: an outbound message applies the deterministic outbound transition; an inbound message is enqueued for classification. This avoids superseded/out-of-order transitions on the initial backlog and removes the race between a synchronous outbound transition and an asynchronous inbound classification.
+- Classification runs in an **in-process, sequential queue** (one LLM call at a time). The durable recovery marker is the thread's `needs_classification` state: on startup, every such thread's latest inbound message is re-enqueued.
+- `category_suggestion` is **advisory only** — it is recorded in `action_log` but never auto-applied to a contact's `category` (which drives SLA). Category changes are manual (contacts `PATCH`).
+- If gateway credentials are not yet configured, classification is skipped and threads remain `needs_classification`.
+
 ### Drafting job
 
 Inputs assembled by `PromptAssembler.buildDraftPrompt(threadId, rawIntent?)`:
@@ -758,6 +765,12 @@ Calls `GatewayClient.complete()` with `temperature` from settings. Writes a new 
 | Outbound sent                    | any                    | `awaiting_their_reply` |
 | Manual close                     | any                    | `closed`               |
 | Manual schedule followup         | any                    | `scheduled_followup`   |
+
+**SLA anchoring + the `needs_classification` start state (Phase 4):**
+
+- The SLA deadline is anchored to the relevant message timestamp, not "now": `awaiting_your_reply` → `last_inbound_at + slaHours`; `awaiting_their_reply` → `last_outbound_at + 72h`. Overdue backlog threads therefore surface immediately (and may generate many `sla_breach` follow-ups on the first sync — expected).
+- `slaHours` for `awaiting_your_reply` is `agent.sla.<category>.awaiting_your_reply_hours` (client_established=12, client_new=4), with a **24h fallback** for any other category or missing key.
+- Transitions from the initial `needs_classification` state: inbound `requires_response=true` → `awaiting_your_reply`; inbound `requires_response=false` → `informational`.
 
 SLA recomputed on each state change using settings keys.
 
@@ -986,6 +999,8 @@ Each phase has explicit acceptance criteria. Don't move to the next phase until 
 - Threads requiring response surface in Needs Attention sorted by urgency + SLA.
 - SLA breaches generate follow_ups within 5 minutes of the deadline.
 - Action log captures every classification.
+
+**Scope note:** Phase 4 ships the classification/state/follow-up engine and its API (`/threads/needs-attention`, `/threads/:id/state`, `/threads/:id/classify`, contacts `GET`/`PATCH`). Item 5 (the PWA "Needs Attention" view) is deferred to when the PWA is built (Phase 2.5), since no React PWA exists yet. The follow-up engine creates `follow_ups` rows + emits SSE; Web Push delivery on breach is Phase 5.5. The `GET/POST /followups` HTTP endpoints (§9) are deferred (not required by Phase 4 acceptance).
 
 ### Phase 5 — Drafting + review + send (1.5 weeks)
 

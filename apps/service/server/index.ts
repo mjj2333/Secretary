@@ -16,6 +16,18 @@ import { ImapProvider } from './providers/ImapProvider.js';
 import type { ImapConfig } from './providers/ProviderInterface.js';
 import { buildImapConfig } from './providers/imapConfig.js';
 import type { AccountRow } from './db/schema.js';
+import { StateMachine } from './agent/StateMachine.js';
+import { ThreadsRepository } from './db/repositories/ThreadsRepository.js';
+import { MessagesRepository } from './db/repositories/MessagesRepository.js';
+import { ContactsRepository } from './db/repositories/ContactsRepository.js';
+import { SettingsRepository } from './db/repositories/SettingsRepository.js';
+import { ActionLogRepository } from './db/repositories/ActionLogRepository.js';
+import { FollowUpsRepository } from './db/repositories/FollowUpsRepository.js';
+import { createGatewayClient, type GatewayClient } from './llm/GatewayClient.js';
+import { PromptAssembler } from './agent/PromptAssembler.js';
+import { Classifier } from './agent/Classifier.js';
+import { ClassificationQueue } from './agent/ClassificationQueue.js';
+import { FollowUpEngine } from './agent/FollowUpEngine.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -40,8 +52,64 @@ async function main(): Promise<void> {
     sessions.currentBootstrapToken(),
     'utf8',
   );
+
+  // Repositories
+  const threadsRepo = new ThreadsRepository(db);
+  const messagesRepo = new MessagesRepository(db);
+  const contactsRepo = new ContactsRepository(db);
+  const settingsRepo = new SettingsRepository(db);
+  const actionsRepo = new ActionLogRepository(db);
+  const followUpsRepo = new FollowUpsRepository(db);
+
+  // GatewayClient — only built when keychain credentials are present
+  let gateway: GatewayClient | null = null;
+  const gwApiKey = store.get('app.gateway-api-key');
+  const gwPayloadKey = store.get('app.payload-key');
+  if (gwApiKey && gwPayloadKey) {
+    gateway = createGatewayClient({
+      gatewayUrl: config.gatewayUrl,
+      useCfHeaders: config.gatewayUseCfHeaders,
+      apiKey: gwApiKey,
+      payloadKey: gwPayloadKey,
+      ...(config.gatewayUseCfHeaders
+        ? {
+            cfClientId: store.get('app.cf-access-id') ?? '',
+            cfClientSecret: store.get('app.cf-access-secret') ?? '',
+          }
+        : {}),
+    });
+  } else {
+    log.warn('gateway credentials missing; classification disabled until setup completes');
+  }
+
+  // Agent layer
+  const stateMachine = new StateMachine(
+    threadsRepo,
+    contactsRepo,
+    settingsRepo,
+    actionsRepo,
+    eventBus,
+  );
+  const promptAssembler = new PromptAssembler(messagesRepo, threadsRepo, contactsRepo);
+  const classifier = new Classifier(
+    promptAssembler,
+    gateway,
+    stateMachine,
+    threadsRepo,
+    messagesRepo,
+    actionsRepo,
+    eventBus,
+    settingsRepo,
+    log,
+  );
+  const classificationQueue = new ClassificationQueue(classifier);
+  const followUpEngine = new FollowUpEngine(db, threadsRepo, followUpsRepo, actionsRepo, eventBus);
+
   const providers = new ProviderRegistry();
-  const sync = new SyncManager(db, providers, eventBus);
+  const sync = new SyncManager(db, providers, eventBus, Date.now, {
+    enqueueClassification: (messageId) => classificationQueue.enqueue(messageId),
+    onOutbound: (threadId) => stateMachine.onOutbound(threadId),
+  });
   const providerFactory = (cfg: ImapConfig) => new ImapProvider(cfg);
 
   const setup = evaluateFirstRun(store, config.dataDir, config.gatewayUseCfHeaders);
@@ -59,6 +127,8 @@ async function main(): Promise<void> {
     providers,
     sync,
     providerFactory,
+    classificationQueue,
+    stateMachine,
   });
 
   await app.listen({ port: config.port, host: config.host });
@@ -91,6 +161,14 @@ async function main(): Promise<void> {
     }
   }
 
+  followUpEngine.start();
+
+  // Re-enqueue any threads that still need classification (e.g. from a prior crash).
+  for (const thread of threadsRepo.findNeedsClassification()) {
+    const latest = messagesRepo.latestInboundForThread(thread.id);
+    if (latest) classificationQueue.enqueue(latest.id);
+  }
+
   // Graceful shutdown: close the server (flushes in-flight responses) and the DB
   // (checkpoints WAL) so a tray Quit / Electron kill doesn't leave -wal/-shm behind.
   let shuttingDown = false;
@@ -99,6 +177,7 @@ async function main(): Promise<void> {
       if (shuttingDown) return;
       shuttingDown = true;
       log.info({ sig }, 'shutting down');
+      followUpEngine.stop();
       void app
         .close()
         .catch(() => undefined)

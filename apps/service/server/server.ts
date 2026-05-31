@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { SecretaryError } from '@secretary/shared-types';
+import type { ThreadState } from '@secretary/shared-types';
 import type { SessionTokens } from './crypto/SessionTokens.js';
 import type { EventBus } from './eventBus.js';
 import type { HttpsOptions } from './httpsOptions.js';
@@ -18,6 +19,7 @@ import type { SecretStore } from './auth/SecretStore.js';
 import type { EmailProvider, ImapConfig } from './providers/ProviderInterface.js';
 import { registerAccountsRoutes } from './api/accounts.js';
 import { registerThreadsRoutes } from './api/threads.js';
+import { registerContactsRoutes } from './api/contacts.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -33,6 +35,10 @@ export interface ServerDeps {
   secrets: SecretStore;
   /** Builds a provider for a resolved config — injectable so tests use a fake. */
   providerFactory: (config: ImapConfig) => EmailProvider;
+  /** Enqueue a message id for asynchronous classification. */
+  classificationQueue: { enqueue(messageId: string): void };
+  /** Apply manual thread state overrides. */
+  stateMachine: { onManual(threadId: string, state: ThreadState, reason?: string): void };
 }
 
 /**
@@ -108,6 +114,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       registerEventRoutes(api, deps);
       registerAccountsRoutes(api, deps);
       registerThreadsRoutes(api, deps);
+      registerContactsRoutes(api, deps);
     },
     { prefix: '/api/v1' },
   );

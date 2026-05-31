@@ -12,6 +12,11 @@ import { ProviderRegistry } from '../../server/providers/ProviderRegistry.js';
 import { SyncManager } from '../../server/sync/SyncManager.js';
 import type { ImapConfig } from '../../server/providers/ProviderInterface.js';
 import { FakeEmailProvider } from './fakeProvider.js';
+import { StateMachine } from '../../server/agent/StateMachine.js';
+import { ThreadsRepository } from '../../server/db/repositories/ThreadsRepository.js';
+import { ContactsRepository } from '../../server/db/repositories/ContactsRepository.js';
+import { SettingsRepository } from '../../server/db/repositories/SettingsRepository.js';
+import { ActionLogRepository } from '../../server/db/repositories/ActionLogRepository.js';
 
 export interface TestServer {
   app: FastifyInstance;
@@ -24,6 +29,8 @@ export interface TestServer {
   providers: ProviderRegistry;
   sync: SyncManager;
   madeProviders: FakeEmailProvider[];
+  classificationQueue: { enqueued: string[]; enqueue(messageId: string): void };
+  stateMachine: StateMachine;
 }
 
 /** Builds a fully-wired server against a temp encrypted DB and an in-memory secret store. */
@@ -43,6 +50,21 @@ export async function makeTestServer(
     madeProviders.push(p);
     return p;
   };
+  const enqueued: string[] = [];
+  const classificationQueue = {
+    enqueued,
+    enqueue(messageId: string) {
+      enqueued.push(messageId);
+    },
+  };
+  const stateMachine = new StateMachine(
+    new ThreadsRepository(db),
+    new ContactsRepository(db),
+    new SettingsRepository(db),
+    new ActionLogRepository(db),
+    eventBus,
+  );
+
   const app = buildServer({
     db,
     sessions,
@@ -52,6 +74,8 @@ export async function makeTestServer(
     providers,
     sync,
     providerFactory,
+    classificationQueue,
+    stateMachine,
     ...(opts.pwaDir ? { pwaDir: opts.pwaDir } : {}),
   });
   await app.ready();
@@ -61,5 +85,18 @@ export async function makeTestServer(
   // A valid bearer token for protected-route tests (default: consume bootstrap).
   const session =
     (opts.consumeBootstrap ?? true) ? sessions.exchangeBootstrap(bootstrap).token : '';
-  return { app, store, db, sessions, eventBus, session, bootstrap, providers, sync, madeProviders };
+  return {
+    app,
+    store,
+    db,
+    sessions,
+    eventBus,
+    session,
+    bootstrap,
+    providers,
+    sync,
+    madeProviders,
+    classificationQueue,
+    stateMachine,
+  };
 }
