@@ -9,7 +9,8 @@ const client = createGatewayClient({
   payloadKey: store.get('app.payload-key') ?? '',
 });
 const out = await client.complete({
-  model: 'qwen2.5:14b-instruct-q5_K_M',
+  // Override with GATEWAY_TEST_MODEL to use whatever model you have pulled locally.
+  model: process.env.GATEWAY_TEST_MODEL ?? 'qwen2.5:14b-instruct-q5_K_M',
   prompt: 'Say hi in 3 words.',
 });
 console.log(out);
