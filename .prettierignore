@@ -6,3 +6,7 @@ release/
 coverage/
 pnpm-lock.yaml
 *.tsbuildinfo
+
+# Built PWA output (also matched by the dist/ rule above; explicit for clarity).
+apps/service/pwa/dist/
+apps/service/dist/pwa/

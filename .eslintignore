@@ -5,3 +5,9 @@ out/
 release/
 coverage/
 *.tsbuildinfo
+
+# PWA source is type-checked via tsc (strict) and the UI is manually verified
+# per BRIEF §18. Proper React linting (eslint-plugin-react / react-hooks) is a
+# deliberate next-phase addition alongside the designed screens, so the central
+# JS-oriented ESLint config intentionally scopes out the PWA for now.
+apps/service/pwa/

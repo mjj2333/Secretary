@@ -1,5 +1,6 @@
 packages:
   - 'apps/*'
+  - 'apps/service/pwa'
   - 'packages/*'
 
 # esbuild's postinstall fetches the platform-specific binary; vitest uses esbuild

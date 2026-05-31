@@ -30,4 +30,22 @@ describe('SSE events route', () => {
     expect(res.statusCode).toBe(401);
     await app.close();
   });
+
+  it('authenticates the SSE stream via ?token= when no Authorization header is present', async () => {
+    process.env.SSE_TEST_CLOSE_MS = '50';
+    const { app, session } = await makeTestServer();
+    const res = await app.inject({ method: 'GET', url: `/api/v1/events?token=${session}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    await app.close();
+  });
+
+  it('rejects the SSE stream with a bad/absent ?token=', async () => {
+    const { app } = await makeTestServer();
+    const bad = await app.inject({ method: 'GET', url: '/api/v1/events?token=nope' });
+    const none = await app.inject({ method: 'GET', url: '/api/v1/events' });
+    expect(bad.statusCode).toBe(401);
+    expect(none.statusCode).toBe(401);
+    await app.close();
+  });
 });

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3-multiple-ciphers';
 import { SecretaryError } from '@secretary/shared-types';
@@ -76,7 +77,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!path.startsWith('/api/v1')) return;
     if (PUBLIC_ROUTES.has(`${req.method} ${path}`)) return;
     const header = req.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    let token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    // EventSource cannot set headers, so the SSE stream authenticates via ?token=.
+    if (!token && path === '/api/v1/events') {
+      const q = (req.query as { token?: unknown }).token;
+      if (typeof q === 'string') token = q;
+    }
     if (!token || !deps.sessions.validateSession(token)) {
       reply.code(401).send({ error: { code: 'unauthorized', message: 'Unauthorized' } });
     }
@@ -104,15 +110,26 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     reply.code(500).send({ error: { code: 'internal_error', message: 'Internal server error' } });
   });
 
-  // Keep unknown routes / method mismatches on the same {error} envelope as everything else.
-  app.setNotFoundHandler((_req, reply) => {
-    reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
-  });
-
   if (deps.pwaDir) {
-    const html = readFileSync(join(deps.pwaDir, 'index.html'), 'utf8');
-    app.get('/', async (_req, reply) => {
-      reply.header('content-type', 'text/html').send(html);
+    const { pwaDir } = deps;
+    // Serve built SPA assets (index.html, /assets/*, manifest, sw) without auth — the
+    // onRequest guard already skips non-/api/v1 paths.
+    app.register(fastifyStatic, { root: pwaDir, wildcard: false });
+    // SPA fallback: any non-/api/v1 GET that isn't a real file returns index.html so the
+    // client-side router can handle it. /api/v1 keeps its {error} 404 (handler below).
+    const indexHtml = readFileSync(join(pwaDir, 'index.html'), 'utf8');
+    app.setNotFoundHandler((req, reply) => {
+      const path = req.url.split('?')[0] ?? req.url;
+      if (req.method === 'GET' && !path.startsWith('/api/v1')) {
+        reply.header('content-type', 'text/html').send(indexHtml);
+        return;
+      }
+      reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
+    });
+  } else {
+    // No PWA build present (e.g. some tests): keep the plain {error} 404 handler.
+    app.setNotFoundHandler((_req, reply) => {
+      reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
     });
   }
 

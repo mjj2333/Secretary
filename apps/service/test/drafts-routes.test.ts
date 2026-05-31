@@ -144,8 +144,12 @@ describe('drafts routes', () => {
       payload: {},
     });
     expect(res.statusCode).toBe(502);
-    const draftRow = db.prepare('SELECT status FROM drafts WHERE id = ?').get(id) as { status: string };
-    const threadRow = db.prepare("SELECT state FROM threads WHERE id='t1'").get() as { state: string };
+    const draftRow = db.prepare('SELECT status FROM drafts WHERE id = ?').get(id) as {
+      status: string;
+    };
+    const threadRow = db.prepare("SELECT state FROM threads WHERE id='t1'").get() as {
+      state: string;
+    };
     expect(draftRow.status).toBe('failed');
     expect(threadRow.state).toBe('awaiting_your_reply'); // NOT flipped on send failure
     await app.close();

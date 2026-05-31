@@ -973,6 +973,8 @@ Each phase has explicit acceptance criteria. Don't move to the next phase until 
 - Installing fresh on her machine and opening the PWA leads through setup, ending in a working LLM round-trip and a registered push subscription.
 - Reloading the PWA after setup goes to `/needs-attention` (empty state until accounts are added).
 
+**Implementation note (built 2026-05-31):** Phase 2.5 was delivered as a **foundation slice** — the Vite/React/TS/Tailwind app, the bottom-nav app shell + Wouter routing with **placeholder route bodies** (Needs Attention / Inbox / Contacts / Settings list their real API data; Follow-ups + thread draft-review are stubs), the TanStack-Query API client + bootstrap→session auth (localStorage session → `#bootstrap=` hash → paste-token fallback), the SSE→query-invalidation plumbing with auto-reconnect, and the manifest + Workbox precache. The **designed screens** (Needs Attention cards, thread/draft review/edit/send) are a **follow-on phase**, and the **setup wizard** (step 4 above) is **deferred** — the dev machine is already configured via the tray + keychain, so secrets aren't entered through the PWA yet. The service serves the built SPA via `@fastify/static` + an SPA fallback; the SSE route also accepts `?token=` because the browser `EventSource` can't set an `Authorization` header. Web Push + offline runtime caching remain Phase 5.5. Routing uses **Wouter**; PWA icons are a placeholder monogram SVG for now.
+
 ### Phase 3 — Proton via Bridge (1.5 weeks)
 
 1. `ImapProvider` implementing `EmailProvider`.
