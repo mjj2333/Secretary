@@ -912,7 +912,7 @@ Each phase has explicit acceptance criteria. Don't move to the next phase until 
 2. `apps/service/server/` — Fastify HTTPS server, mkcert-generated cert (script in `infra/mkcert/`).
 3. SQLCipher database init: generate key on first run, store in keychain, open DB.
 4. Migration runner + initial migration with all tables from §6.
-5. Repositories pattern: one file per table with typed query functions.
+5. Repositories pattern: one file per table with typed query functions. **Built just-in-time per phase** rather than all at once: Phase 2 ships only `SettingsRepository` and `PushSubscriptionRepository` (the tables it uses); the remaining tables get their repositories in the phases that consume them (Phases 3–6). The full schema is still created up front in the initial migration.
 6. `GatewayClient` — calls the gateway with Cloudflare service token + API key + encryption. Reads credentials from keychain.
 7. First-run setup flow:
    - On startup, check if Cloudflare credentials + gateway API key + encryption key + DB key all exist in keychain

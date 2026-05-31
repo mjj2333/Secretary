@@ -1,0 +1,10 @@
+# Normalize line endings to LF in the repo AND the working tree on every platform.
+# Without this, Windows core.autocrlf checks out CRLF, which fails Prettier's
+# endOfLine: "lf" check. eol=lf keeps the working tree LF so the format gate is
+# deterministic on Windows and macOS alike.
+* text=auto eol=lf
+
+# Binary assets — never touch line endings.
+*.png binary
+*.ico binary
+*.icns binary
