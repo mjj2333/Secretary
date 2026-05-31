@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Secretary</title>
+  </head>
+  <body>
+    <main style="font-family: system-ui; max-width: 32rem; margin: 4rem auto; padding: 0 1rem">
+      <h1>Secretary</h1>
+      <p id="status">Service is running. The app UI arrives in Phase 2.5.</p>
+    </main>
+    <script>
+      const m = location.hash.match(/bootstrap=([^&]+)/);
+      if (m) {
+        document.getElementById('status').textContent =
+          'Bootstrap token received. The setup wizard (Phase 2.5) will exchange it for a session.';
+        history.replaceState(null, '', location.pathname);
+      }
+    </script>
+  </body>
+</html>

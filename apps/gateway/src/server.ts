@@ -1,11 +1,7 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import type { ZodIssue } from 'zod';
-import {
-  decryptJson,
-  encryptJson,
-  type EncryptedEnvelope,
-} from '@secretary/shared-crypto';
+import { decryptJson, encryptJson, type EncryptedEnvelope } from '@secretary/shared-crypto';
 import {
   ENVELOPE_CONTENT_TYPE,
   completeRequestSchema,
@@ -49,18 +45,14 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   const authHook = makeAuthHook({ expectedKey: config.apiKey });
   const keyHash = hashKeyForLogging(config.apiKey);
 
-  app.addContentTypeParser(
-    ENVELOPE_CONTENT_TYPE,
-    { parseAs: 'string' },
-    (_req, body, done) => {
-      try {
-        done(null, JSON.parse(body as string));
-      } catch (err: unknown) {
-        const wrapped = err instanceof Error ? err : new Error(String(err));
-        done(wrapped, undefined);
-      }
-    },
-  );
+  app.addContentTypeParser(ENVELOPE_CONTENT_TYPE, { parseAs: 'string' }, (_req, body, done) => {
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err: unknown) {
+      const wrapped = err instanceof Error ? err : new Error(String(err));
+      done(wrapped, undefined);
+    }
+  });
 
   app.setErrorHandler((err: unknown, request, reply) => {
     const asError = err instanceof Error ? err : new Error(String(err));
@@ -74,16 +66,11 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       );
       return reply.status(err.status).send({ error: { code: err.code, message: err.message } });
     }
-    const statusCode = (err as { statusCode?: number }).statusCode;
+    const { statusCode } = err as { statusCode?: number };
     if (statusCode === 401) {
-      return reply
-        .status(401)
-        .send({ error: { code: 'unauthorized', message: asError.message } });
+      return reply.status(401).send({ error: { code: 'unauthorized', message: asError.message } });
     }
-    request.log.error(
-      { err: { message: asError.message, name: asError.name } },
-      'unhandled error',
-    );
+    request.log.error({ err: { message: asError.message, name: asError.name } }, 'unhandled error');
     return reply
       .status(500)
       .send({ error: { code: 'internal_error', message: 'Internal server error' } });

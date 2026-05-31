@@ -1,0 +1,41 @@
+{
+  "name": "@secretary/service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/electron/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json && node -e \"const {cpSync}=require('node:fs');cpSync('server/db/migrations','dist/server/db/migrations',{recursive:true,filter:(s)=>!s.endsWith('.ts')});cpSync('pwa','dist/pwa',{recursive:true});cpSync('electron/tray-icon.png','dist/electron/tray-icon.png')\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "dev:server": "tsx watch server/index.ts",
+    "dev": "electron .",
+    "set-secret": "tsx scripts/set-secret.ts",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3-multiple-ciphers",
+    "clean": "rm -rf dist .tsbuildinfo coverage"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@napi-rs/keyring": "^1.1.7",
+    "@secretary/llm-protocol": "workspace:*",
+    "@secretary/shared-crypto": "workspace:*",
+    "@secretary/shared-types": "workspace:*",
+    "better-sqlite3-multiple-ciphers": "^11.5.0",
+    "fastify": "^5.1.0",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "3.6.2",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.16.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "electron": "^33.2.0",
+    "pino-pretty": "^11.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
+  }
+}

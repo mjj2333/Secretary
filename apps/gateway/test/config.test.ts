@@ -49,9 +49,9 @@ describe('loadConfig', () => {
   });
 
   it('throws when keys are not 64 hex chars', () => {
-    expect(() =>
-      loadConfig({ GATEWAY_API_KEY: 'short', PAYLOAD_ENCRYPTION_KEY: HEX }),
-    ).toThrow(/64-char hex/);
+    expect(() => loadConfig({ GATEWAY_API_KEY: 'short', PAYLOAD_ENCRYPTION_KEY: HEX })).toThrow(
+      /64-char hex/,
+    );
   });
 
   it('lower-cases the API key for consistent comparison', () => {
