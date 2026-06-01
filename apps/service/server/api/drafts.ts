@@ -5,9 +5,6 @@ import {
   NotFoundError,
   UpstreamError,
   ValidationError,
-  type DraftView,
-  type EmailAddress,
-  type DiffOp,
   type ThreadState,
 } from '@secretary/shared-types';
 import { ActionLogRepository } from '../db/repositories/ActionLogRepository.js';
@@ -15,6 +12,7 @@ import { DraftsRepository } from '../db/repositories/DraftsRepository.js';
 import { MessagesRepository } from '../db/repositories/MessagesRepository.js';
 import type { DraftRow } from '../db/schema.js';
 import type { ProviderRegistry } from '../providers/ProviderRegistry.js';
+import { draftView, parseAddrs } from './views.js';
 
 const createSchema = z
   .object({
@@ -26,34 +24,6 @@ const createSchema = z
 const patchSchema = z
   .object({ bodyText: z.string().optional(), subject: z.string().optional() })
   .strict();
-
-function parseAddrs(json: string | null): EmailAddress[] {
-  if (!json) return [];
-  try {
-    return JSON.parse(json) as EmailAddress[];
-  } catch {
-    return [];
-  }
-}
-
-function draftView(row: DraftRow): DraftView {
-  return {
-    id: row.id,
-    threadId: row.thread_id,
-    accountId: row.account_id,
-    version: row.version,
-    to: parseAddrs(row.to_addresses),
-    cc: parseAddrs(row.cc_addresses),
-    subject: row.subject,
-    bodyText: row.body_text,
-    rawIntent: row.raw_intent,
-    polishDiff: row.polish_diff ? (JSON.parse(row.polish_diff) as DiffOp[]) : null,
-    status: row.status,
-    modelUsed: row.model_used,
-    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
-    sentAt: row.sent_at ? new Date(row.sent_at).toISOString() : null,
-  };
-}
 
 export interface DraftsRouteDeps {
   db: Database.Database;

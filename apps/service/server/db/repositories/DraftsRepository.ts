@@ -79,6 +79,16 @@ export class DraftsRepository {
       .get(threadId) as DraftRow | undefined;
   }
 
+  /** Highest-version draft for a thread that is still reviewable (not sent/discarded). */
+  currentForThread(threadId: string): DraftRow | undefined {
+    return this.db
+      .prepare(
+        `SELECT * FROM drafts WHERE thread_id = ? AND status NOT IN ('sent','discarded')
+         ORDER BY version DESC LIMIT 1`,
+      )
+      .get(threadId) as DraftRow | undefined;
+  }
+
   updateBody(id: string, fields: { bodyText?: string; subject?: string }): void {
     const sets: string[] = [];
     const vals: unknown[] = [];

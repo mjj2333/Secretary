@@ -38,14 +38,63 @@ export function useSettings(): UseQueryResult<Record<string, unknown>> {
   });
 }
 
-/** Create a draft for a thread (synchronous on the server). */
-export function useCreateDraft() {
+/** Generate the first draft for a thread (no draft yet). */
+export function useGenerateDraft() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { threadId: string; rawIntent?: string }) =>
       apiFetch<DraftView>('/drafts', { method: 'POST', body: JSON.stringify(vars) }),
     onSuccess: (_d, vars) => {
       void qc.invalidateQueries({ queryKey: ['thread', vars.threadId] });
+      void qc.invalidateQueries({ queryKey: ['needs-attention'] });
+    },
+  });
+}
+
+/** Regenerate a thread's draft (new version), optionally with a new raw intent. */
+export function useRegenerateDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { threadId: string; rawIntent?: string }) =>
+      apiFetch<DraftView>('/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ ...vars, regenerate: true }),
+      }),
+    onSuccess: (_d, vars) => {
+      void qc.invalidateQueries({ queryKey: ['thread', vars.threadId] });
+    },
+  });
+}
+
+/** Save edits to a draft's body/subject. */
+export function useEditDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      draftId: string;
+      threadId: string;
+      bodyText?: string;
+      subject?: string;
+    }) =>
+      apiFetch<DraftView>(`/drafts/${vars.draftId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ bodyText: vars.bodyText, subject: vars.subject }),
+      }),
+    onSuccess: (_d, vars) => {
+      void qc.invalidateQueries({ queryKey: ['thread', vars.threadId] });
+    },
+  });
+}
+
+/** Discard a draft. */
+export function useDiscardDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { draftId: string; threadId: string }) =>
+      apiFetch<{ discarded: boolean }>(`/drafts/${vars.draftId}`, { method: 'DELETE' }),
+    onSuccess: (_d, vars) => {
+      void qc.invalidateQueries({ queryKey: ['thread', vars.threadId] });
+      void qc.invalidateQueries({ queryKey: ['needs-attention'] });
     },
   });
 }
@@ -54,13 +103,14 @@ export function useCreateDraft() {
 export function useSendDraft() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { draftId: string }) =>
+    mutationFn: (vars: { draftId: string; threadId: string }) =>
       apiFetch<{ providerMessageId: string; threadState: string }>(`/drafts/${vars.draftId}/send`, {
         method: 'POST',
         body: '{}',
       }),
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       void qc.invalidateQueries({ queryKey: ['needs-attention'] });
+      void qc.invalidateQueries({ queryKey: ['thread', vars.threadId] });
     },
   });
 }

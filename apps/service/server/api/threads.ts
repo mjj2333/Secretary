@@ -4,7 +4,6 @@ import { z } from 'zod';
 import {
   NotFoundError,
   ValidationError,
-  type EmailAddress,
   type MessageView,
   type NeedsAttentionItem,
   type ThreadState,
@@ -13,7 +12,10 @@ import {
 } from '@secretary/shared-types';
 import { ThreadsRepository, type AttentionRow } from '../db/repositories/ThreadsRepository.js';
 import { MessagesRepository } from '../db/repositories/MessagesRepository.js';
+import { ContactsRepository } from '../db/repositories/ContactsRepository.js';
+import { DraftsRepository } from '../db/repositories/DraftsRepository.js';
 import type { MessageRow, ThreadRow } from '../db/schema.js';
+import { draftView, parseAddrs, resolveSenderName } from './views.js';
 
 const stateBodySchema = z.object({
   state: z.enum([
@@ -27,15 +29,6 @@ const stateBodySchema = z.object({
   reason: z.string().optional(),
 });
 
-function parseAddrs(json: string | null): EmailAddress[] {
-  if (!json) return [];
-  try {
-    return JSON.parse(json) as EmailAddress[];
-  } catch {
-    return [];
-  }
-}
-
 function threadSummary(row: ThreadRow): ThreadSummary {
   return {
     id: row.id,
@@ -48,7 +41,9 @@ function threadSummary(row: ThreadRow): ThreadSummary {
   };
 }
 
-function needsAttentionItem(row: AttentionRow): NeedsAttentionItem {
+function needsAttentionItem(
+  row: AttentionRow,
+): Omit<NeedsAttentionItem, 'senderName' | 'hasDraft'> {
   return {
     ...threadSummary(row),
     urgency: row.urgency,
@@ -83,9 +78,17 @@ export interface ThreadsRouteDeps {
 export function registerThreadsRoutes(app: FastifyInstance, deps: ThreadsRouteDeps): void {
   const threads = new ThreadsRepository(deps.db);
   const messages = new MessagesRepository(deps.db);
+  const contacts = new ContactsRepository(deps.db);
+  const drafts = new DraftsRepository(deps.db);
 
   app.get('/threads/needs-attention', async () => ({
-    data: threads.needsAttention().map(needsAttentionItem),
+    // Per-row enrichment (sender + has-draft) is fine: the needs-attention list is bounded
+    // (threads awaiting reply / with a pending follow-up) and these are indexed point lookups.
+    data: threads.needsAttention().map((row) => ({
+      ...needsAttentionItem(row),
+      senderName: resolveSenderName(row, messages, contacts),
+      hasDraft: drafts.currentForThread(row.id) !== undefined,
+    })),
   }));
 
   app.get('/threads', async (req) => {
@@ -104,9 +107,12 @@ export function registerThreadsRoutes(app: FastifyInstance, deps: ThreadsRouteDe
     const { id } = req.params as { id: string };
     const row = threads.get(id);
     if (!row) throw new NotFoundError('Thread not found');
+    const current = drafts.currentForThread(id);
     const view: ThreadWithMessages = {
       ...threadSummary(row),
+      senderName: resolveSenderName(row, messages, contacts),
       messages: messages.listByThread(id).map(messageView),
+      currentDraft: current ? draftView(current) : null,
     };
     return { data: view };
   });

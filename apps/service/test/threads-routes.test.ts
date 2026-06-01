@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeTestServer } from './helpers/testServer.js';
+import { DraftsRepository } from '../server/db/repositories/DraftsRepository.js';
 
 describe('threads routes', () => {
   it('lists threads and returns a thread with its messages', async () => {
@@ -47,6 +48,77 @@ describe('threads routes', () => {
   });
 });
 
+describe('thread detail enrichment', () => {
+  it('includes senderName (contact display name) and the current draft', async () => {
+    const { app, session, db } = await makeTestServer();
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','me@x.com')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO contacts (id, email_address, display_name, category, total_messages_in, total_messages_out, do_not_auto_draft) VALUES ('c1','jane@x.com','Jane Doe','client_established',1,0,0)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO threads (id, account_id, subject_normalized, participants, message_count, last_message_at, state) VALUES ('th1','acc1','Hi','["jane@x.com"]',1,1000,'awaiting_your_reply')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO messages (id, account_id, provider_id, thread_id, from_address, from_name, direction, date_received, subject, snippet) VALUES ('m1','acc1','u1','th1','jane@x.com','J. Doe','inbound',1000,'Hi','hello')`,
+    ).run();
+    new DraftsRepository(db).insert({
+      threadId: 'th1',
+      accountId: 'acc1',
+      version: 1,
+      inReplyToMessageId: null,
+      to: [{ address: 'jane@x.com' }],
+      cc: [],
+      subject: 'Re: Hi',
+      bodyText: 'Hello back',
+      rawIntent: null,
+      polishDiff: null,
+      systemPromptUsed: 'p',
+      modelUsed: 'm',
+      tokensIn: 1,
+      tokensOut: 1,
+      latencyMs: 1,
+      createdAt: 2000,
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/threads/th1',
+      headers: { authorization: `Bearer ${session}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+    expect(data.senderName).toBe('Jane Doe');
+    expect(data.currentDraft).not.toBeNull();
+    expect(data.currentDraft.bodyText).toBe('Hello back');
+    await app.close();
+  });
+
+  it('currentDraft is null when there is no reviewable draft; senderName falls back to from_name then email', async () => {
+    const { app, session, db } = await makeTestServer();
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','me@x.com')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO threads (id, account_id, subject_normalized, participants, message_count, last_message_at, state) VALUES ('th2','acc1','Hi','["bob@x.com"]',1,1000,'awaiting_your_reply')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO messages (id, account_id, provider_id, thread_id, from_address, from_name, direction, date_received) VALUES ('m2','acc1','u2','th2','bob@x.com','Bob','inbound',1000)`,
+    ).run();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/threads/th2',
+      headers: { authorization: `Bearer ${session}` },
+    });
+    const { data } = res.json();
+    expect(data.currentDraft).toBeNull();
+    expect(data.senderName).toBe('Bob'); // no contact row → from_name
+    await app.close();
+  });
+});
+
 describe('threads attention/state/classify routes', () => {
   it('needs-attention returns awaiting_your_reply ordered, with follow-up flag', async () => {
     const { app, session, db } = await makeTestServer();
@@ -74,6 +146,50 @@ describe('threads attention/state/classify routes', () => {
     expect(data[0].summary).toBe('Reply needed');
     expect(data[0].slaDeadline).toBe(new Date(5000).toISOString());
     expect(data[0].hasPendingFollowUp).toBe(false);
+    await app.close();
+  });
+
+  it('needs-attention items carry senderName and hasDraft', async () => {
+    const { app, session, db } = await makeTestServer();
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','me@x.com')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO contacts (id, email_address, display_name, category, total_messages_in, total_messages_out, do_not_auto_draft) VALUES ('c1','jane@x.com','Jane Doe','client_established',1,0,0)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO threads (id, account_id, subject_normalized, participants, message_count, last_message_at, state, urgency, sla_deadline) VALUES ('th1','acc1','Hi','["jane@x.com"]',1,1000,'awaiting_your_reply','high',5000)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO messages (id, account_id, provider_id, thread_id, from_address, direction, date_received) VALUES ('m1','acc1','u1','th1','jane@x.com','inbound',1000)`,
+    ).run();
+    new DraftsRepository(db).insert({
+      threadId: 'th1',
+      accountId: 'acc1',
+      version: 1,
+      inReplyToMessageId: null,
+      to: [{ address: 'jane@x.com' }],
+      cc: [],
+      subject: 'Re',
+      bodyText: 'b',
+      rawIntent: null,
+      polishDiff: null,
+      systemPromptUsed: 'p',
+      modelUsed: 'm',
+      tokensIn: 1,
+      tokensOut: 1,
+      latencyMs: 1,
+      createdAt: 2000,
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/threads/needs-attention',
+      headers: { authorization: `Bearer ${session}` },
+    });
+    const item = res.json().data[0];
+    expect(item.senderName).toBe('Jane Doe');
+    expect(item.hasDraft).toBe(true);
     await app.close();
   });
 

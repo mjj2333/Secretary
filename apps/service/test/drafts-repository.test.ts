@@ -6,6 +6,7 @@ import { InMemorySecretStore } from '../server/auth/SecretStore.js';
 import { openDatabase } from '../server/db/connection.js';
 import { ThreadsRepository } from '../server/db/repositories/ThreadsRepository.js';
 import { DraftsRepository } from '../server/db/repositories/DraftsRepository.js';
+import { makeTestServer } from './helpers/testServer.js';
 
 let dir: string;
 beforeEach(() => {
@@ -88,5 +89,51 @@ describe('DraftsRepository', () => {
     // A send-failed draft is still re-sendable, so it remains the latest non-discarded draft.
     expect(repo.latestForThread(threadId)?.id).toBe(id3);
     db.close();
+  });
+});
+
+function seedDraft(db: import('better-sqlite3-multiple-ciphers').Database, version: number) {
+  return new DraftsRepository(db).insert({
+    threadId: 'th1',
+    accountId: 'acc1',
+    version,
+    inReplyToMessageId: null,
+    to: [{ address: 'a@b.com' }],
+    cc: [],
+    subject: 'Re: hi',
+    bodyText: 'body',
+    rawIntent: null,
+    polishDiff: null,
+    systemPromptUsed: 'p',
+    modelUsed: 'm',
+    tokensIn: 1,
+    tokensOut: 1,
+    latencyMs: 1,
+    createdAt: 1000 * version,
+  });
+}
+
+describe('DraftsRepository.currentForThread', () => {
+  it('returns the latest draft that is not sent or discarded', async () => {
+    const { app, db } = await makeTestServer();
+    // drafts has FK on thread_id/account_id (ON DELETE CASCADE) -> seed parents.
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('acc1','imap','A','a@b.com')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO threads (id, account_id, message_count, state) VALUES ('th1','acc1',0,'needs_classification')`,
+    ).run();
+    const repo = new DraftsRepository(db);
+    const v1 = seedDraft(db, 1);
+    const v2 = seedDraft(db, 2);
+    // v2 is pending_review (default) → current
+    expect(repo.currentForThread('th1')?.id).toBe(v2);
+    // discard v2 → falls back to v1 (still pending)
+    repo.markDiscarded(v2);
+    expect(repo.currentForThread('th1')?.id).toBe(v1);
+    // send v1 → no current draft
+    repo.markSent(v1, { sentAt: 1, finalBodySent: 'body' });
+    expect(repo.currentForThread('th1')).toBeUndefined();
+    await app.close();
   });
 });

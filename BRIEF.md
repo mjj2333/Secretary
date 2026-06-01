@@ -846,6 +846,8 @@ Cron-style job runs every 5 minutes:
 - 192/512 icons (PNG, simple monogram for v1)
 - Start URL: `/needs-attention`
 
+**Implementation note (designed screens, 2026-05-31):** The Needs Attention + draft-review screens were built on the Phase-2.5 foundation, replacing the placeholder route bodies. Two deliberate deviations from this section: (1) **Send confirmation is a tap-to-confirm bottom sheet**, not a long-press → modal (long-press is awkward/uncommon on desktop and easy to mis-trigger; the sheet gives the same protection cross-platform). (2) **Swipe gestures** (handle-manually / snooze) and **voice input** (SpeechRecognition for the raw intent) are **deferred** to a later polish pass. The screens consume two new API fields — `currentDraft` + `senderName` on `GET /threads/:id`, and `hasDraft` + `senderName` on needs-attention items — surfaced via a shared `resolveSenderName` + `DraftsRepository.currentForThread` (active draft = not sent/discarded).
+
 ---
 
 ## 13. Operator-side gateway: implementation specifics
