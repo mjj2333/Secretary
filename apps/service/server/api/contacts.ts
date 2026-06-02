@@ -20,7 +20,7 @@ const patchSchema = z
   .object({
     category: z.enum(CONTACT_CATEGORIES).optional(),
     notes: z.string().optional(),
-    styleNotes: z.unknown().optional(),
+    styleNotes: z.string().optional(),
     doNotAutoDraft: z.boolean().optional(),
   })
   .strict();
@@ -32,6 +32,7 @@ function contactView(row: ContactRow): ContactView {
     displayName: row.display_name,
     category: row.category,
     notes: row.notes,
+    styleNotes: row.style_notes,
     doNotAutoDraft: row.do_not_auto_draft === 1,
     totalMessagesIn: row.total_messages_in,
     totalMessagesOut: row.total_messages_out,

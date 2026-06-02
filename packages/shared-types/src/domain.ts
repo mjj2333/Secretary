@@ -164,6 +164,7 @@ export interface ContactView {
   displayName: string | null;
   category: ContactCategory;
   notes: string | null;
+  styleNotes: string | null;
   doNotAutoDraft: boolean;
   totalMessagesIn: number;
   totalMessagesOut: number;

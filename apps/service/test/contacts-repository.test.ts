@@ -42,12 +42,12 @@ describe('ContactsRepository', () => {
       category: 'client_new',
       notes: 'Met at the expo',
       doNotAutoDraft: true,
-      styleNotes: { tone: 'warm' },
+      styleNotes: 'Warm and brief.',
     });
     expect(updated?.category).toBe('client_new');
     expect(updated?.notes).toBe('Met at the expo');
     expect(updated?.do_not_auto_draft).toBe(1);
-    expect(JSON.parse(updated!.style_notes!)).toEqual({ tone: 'warm' });
+    expect(updated?.style_notes).toBe('Warm and brief.');
 
     expect(repo.list({ category: 'client_new', limit: 10, offset: 0 }).map((c) => c.id)).toEqual([
       alice.id,

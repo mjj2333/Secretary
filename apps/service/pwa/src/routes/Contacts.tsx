@@ -1,3 +1,4 @@
+import { Link } from 'wouter';
 import { useContacts } from '../api/hooks.js';
 export function Contacts(): JSX.Element {
   const q = useContacts();
@@ -7,7 +8,9 @@ export function Contacts(): JSX.Element {
     <ul className="divide-y divide-slate-100">
       {(q.data ?? []).map((c) => (
         <li key={c.id} className="py-2 text-sm">
-          {c.displayName ?? c.emailAddress} · {c.category}
+          <Link href={`/contacts/${c.id}`} className="block">
+            {c.displayName ?? c.emailAddress} · {c.category}
+          </Link>
         </li>
       ))}
     </ul>

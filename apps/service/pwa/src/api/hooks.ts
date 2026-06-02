@@ -114,3 +114,56 @@ export function useSendDraft() {
     },
   });
 }
+
+export function useStyleGuide(): UseQueryResult<{ styleGuide: string; isDefault: boolean }> {
+  return useQuery({
+    queryKey: ['style-guide'],
+    queryFn: () => apiFetch<{ styleGuide: string; isDefault: boolean }>('/settings/style-guide'),
+  });
+}
+
+export function useSaveStyleGuide() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { styleGuide: string }) =>
+      apiFetch<Record<string, unknown>>('/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ style_guide: vars.styleGuide }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['style-guide'] });
+      void qc.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+}
+
+export function useContact(id: string): UseQueryResult<ContactView> {
+  return useQuery({
+    queryKey: ['contact', id],
+    queryFn: () => apiFetch<ContactView>(`/contacts/${id}`),
+    enabled: id.length > 0,
+  });
+}
+
+export function usePatchContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      category?: string;
+      notes?: string;
+      styleNotes?: string;
+      doNotAutoDraft?: boolean;
+    }) => {
+      const { id, ...fields } = vars;
+      return apiFetch<ContactView>(`/contacts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(fields),
+      });
+    },
+    onSuccess: (_d, vars) => {
+      void qc.invalidateQueries({ queryKey: ['contact', vars.id] });
+      void qc.invalidateQueries({ queryKey: ['contacts'] });
+    },
+  });
+}

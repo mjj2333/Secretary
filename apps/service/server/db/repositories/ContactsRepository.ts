@@ -6,7 +6,7 @@ import type { ContactRow } from '../schema.js';
 export interface ContactPatch {
   category?: ContactCategory;
   notes?: string;
-  styleNotes?: unknown;
+  styleNotes?: string;
   doNotAutoDraft?: boolean;
 }
 
@@ -72,7 +72,7 @@ export class ContactsRepository {
     }
     if (fields.styleNotes !== undefined) {
       sets.push('style_notes = ?');
-      vals.push(JSON.stringify(fields.styleNotes));
+      vals.push(fields.styleNotes);
     }
     if (fields.doNotAutoDraft !== undefined) {
       sets.push('do_not_auto_draft = ?');

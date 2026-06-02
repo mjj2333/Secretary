@@ -374,7 +374,7 @@ Migrations are sequential `.sql` files in `apps/service/server/db/migrations/`. 
 - `last_contact_at` INTEGER
 - `total_messages_in` INTEGER DEFAULT 0
 - `total_messages_out` INTEGER DEFAULT 0
-- `style_notes` TEXT — JSON
+- `style_notes` TEXT — plain text (free-form notes on how the agent should write to this contact; stored raw, not JSON, as of Phase 6a)
 - `do_not_auto_draft` INTEGER (boolean) DEFAULT 0
 - `screening_status` TEXT CHECK (screening_status IN ('never_screened','screening_in_progress','cleared','rejected') OR screening_status IS NULL)
 - `booking_history` TEXT — JSON array
@@ -1062,6 +1062,8 @@ Each phase has explicit acceptance criteria. Don't move to the next phase until 
 - She can edit the style guide and changes affect future drafts immediately.
 - Sent-mail mining populates style_examples with reasonable entries.
 - Per-contact style notes appear in the draft prompt for that contact.
+
+**Implementation note (2026-06-02):** Phase 6 is delivered in slices. **6a (done):** the style-guide editor in Settings (`GET /settings/style-guide` returns the effective guide + `isDefault`; saves via the existing `PATCH /settings`; the shared `resolveVoiceGuide` helper is used by both the route and `PromptAssembler`), and a per-contact editor (`/contacts/:id` ContactDetail — category, notes, style_notes, do-not-auto-draft); `style_notes` is now plain text on `ContactView` (was JSON-quoted). Item 4 (style-examples retrieval) was already implemented in Phase 5. **Deferred:** item 5 ("heavily edited" detection) → **6b**, because the save-then-send flow makes `body_text == final_body_sent` at send time, so it needs the agent's original generated body preserved (folded into 6b's sent-mail analysis). **6b (next):** sent-mail mining job + manual review UI + heavy-edit detection. **6c (optional):** sqlite-vec embedding retrieval.
 
 ### Phase 7 — Gmail (3-5 evenings)
 

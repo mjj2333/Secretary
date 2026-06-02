@@ -55,4 +55,26 @@ describe('contacts routes', () => {
     expect(missing.statusCode).toBe(404);
     await app.close();
   });
+
+  it('PATCH styleNotes stores + returns a plain string (not JSON-quoted)', async () => {
+    const { app, session, db } = await makeTestServer();
+    db.prepare(
+      `INSERT INTO contacts (id, email_address, display_name, category, total_messages_in, total_messages_out, do_not_auto_draft) VALUES ('c1','jane@x.com','Jane','client_established',1,0,0)`,
+    ).run();
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/contacts/c1',
+      headers: { authorization: `Bearer ${session}` },
+      payload: { styleNotes: 'Keep it warm and brief.' },
+    });
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json().data.styleNotes).toBe('Keep it warm and brief.');
+    const get = await app.inject({
+      method: 'GET',
+      url: '/api/v1/contacts/c1',
+      headers: { authorization: `Bearer ${session}` },
+    });
+    expect(get.json().data.styleNotes).toBe('Keep it warm and brief.');
+    await app.close();
+  });
 });

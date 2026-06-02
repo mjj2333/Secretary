@@ -7,6 +7,7 @@ import type { MessagesRepository } from '../db/repositories/MessagesRepository.j
 import type { SettingsRepository } from '../db/repositories/SettingsRepository.js';
 import type { StyleExamplesRepository } from '../db/repositories/StyleExamplesRepository.js';
 import type { ThreadsRepository } from '../db/repositories/ThreadsRepository.js';
+import { resolveVoiceGuide } from './voiceGuide.js';
 
 const CONTACT_NOTES_MAX = 500;
 const SNIPPET_MAX = 200;
@@ -34,7 +35,6 @@ const TONE: Record<ContactCategory, string> = {
 export class PromptAssembler {
   private classifierSystem: string | null = null;
   private drafterSystem: string | null = null;
-  private voiceBaseline: string | null = null;
 
   constructor(
     private readonly messages: MessagesRepository,
@@ -60,12 +60,7 @@ export class PromptAssembler {
   }
 
   private voiceGuide(): string {
-    const override = this.settings.get<string>('style_guide');
-    if (typeof override === 'string' && override.trim().length > 0) return override;
-    if (this.voiceBaseline === null) {
-      this.voiceBaseline = readFileSync(join(this.promptsDir, 'voice-baseline.md'), 'utf8');
-    }
-    return this.voiceBaseline;
+    return resolveVoiceGuide(this.settings, this.promptsDir).styleGuide;
   }
 
   buildClassificationPrompt(messageId: string): { system: string; prompt: string } {
