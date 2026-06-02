@@ -12,6 +12,8 @@ const DEFAULTS: Record<string, unknown> = {
   'llm.temperature.classify': 0.1,
   'llm.temperature.draft': 0.5,
   'notifications.web_push_enabled': false,
+  'notifications.quiet_hours_start': '22:00',
+  'notifications.quiet_hours_end': '08:00',
 };
 
 /** Inserts default settings without overwriting existing keys. Idempotent. */

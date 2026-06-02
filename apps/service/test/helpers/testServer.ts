@@ -42,7 +42,12 @@ export interface TestServer {
 
 /** Builds a fully-wired server against a temp encrypted DB and an in-memory secret store. */
 export async function makeTestServer(
-  opts: { consumeBootstrap?: boolean; pwaDir?: string; draftBody?: string } = {},
+  opts: {
+    consumeBootstrap?: boolean;
+    pwaDir?: string;
+    draftBody?: string;
+    push?: import('../../server/api/push.js').PushService | null;
+  } = {},
 ): Promise<TestServer> {
   const dir = mkdtempSync(join(tmpdir(), 'secretary-srv-'));
   const store = new InMemorySecretStore();
@@ -104,6 +109,7 @@ export async function makeTestServer(
     stateMachine,
     drafter,
     ...(opts.pwaDir ? { pwaDir: opts.pwaDir } : {}),
+    ...(opts.push !== undefined ? { push: opts.push } : {}),
   });
   await app.ready();
 

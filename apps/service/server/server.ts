@@ -51,6 +51,8 @@ export interface ServerDeps {
       opts?: { rawIntent?: string },
     ): Promise<import('./db/schema.js').DraftRow | null>;
   };
+  /** Web Push service. Omitted/null until VAPID keys exist → push routes 409. */
+  push?: import('./api/push.js').PushService | null;
 }
 
 /**

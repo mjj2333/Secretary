@@ -31,6 +31,10 @@ import { Drafter } from './agent/Drafter.js';
 import { SequentialQueue } from './agent/SequentialQueue.js';
 import { FollowUpEngine } from './agent/FollowUpEngine.js';
 import { DraftsRepository } from './db/repositories/DraftsRepository.js';
+import { ensureVapidKeys, configureWebPush } from './push/vapid.js';
+import { WebPushSender } from './push/WebPushSender.js';
+import { realWebPushClient } from './push/webPushClient.js';
+import { PushSubscriptionRepository } from './db/repositories/PushSubscriptionRepository.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -139,6 +143,34 @@ async function main(): Promise<void> {
   });
   const providerFactory = (cfg: ImapConfig) => new ImapProvider(cfg);
 
+  let push: WebPushSender | null = null;
+  try {
+    const vapid = ensureVapidKeys(store);
+    configureWebPush(vapid);
+    push = new WebPushSender({
+      publicKey: vapid.publicKey,
+      subscriptions: new PushSubscriptionRepository(db),
+      threads: threadsRepo,
+      messages: messagesRepo,
+      contacts: contactsRepo,
+      settings: settingsRepo,
+      client: realWebPushClient,
+      now: () => new Date(),
+    });
+    eventBus.subscribe((event) => {
+      if (event.type === 'draft:ready') {
+        const payload = event.payload as { threadId?: string };
+        if (payload.threadId) void push?.notifyDraftReady(payload.threadId);
+      }
+    });
+    log.info('web push configured');
+  } catch (err) {
+    log.warn(
+      { err: err instanceof Error ? err.message : 'unknown' },
+      'web push setup failed; push disabled',
+    );
+  }
+
   const setup = evaluateFirstRun(store, config.dataDir, config.gatewayUseCfHeaders);
   log.info({ needsSetup: setup.needsSetup, missing: setup.missing }, 'first-run evaluated');
 
@@ -157,6 +189,7 @@ async function main(): Promise<void> {
     classificationQueue,
     stateMachine,
     drafter,
+    push,
   });
 
   await app.listen({ port: config.port, host: config.host });

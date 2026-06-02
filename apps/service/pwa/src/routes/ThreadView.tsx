@@ -101,32 +101,48 @@ export function ThreadView({ id }: { id: string }): JSX.Element {
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setErr(null);
-            // Save the current body, then send (what you see is what sends).
-            // The UI edits only the body; subject is left as-is (omitted from the PATCH).
-            edit.mutate(
-              { draftId: draft.id, threadId: id, bodyText: body },
-              {
-                onError: (e) => {
-                  setConfirming(false);
-                  fail(e);
+            const offline = typeof navigator !== 'undefined' && !navigator.onLine;
+            const doSend = (): void => {
+              send.mutate(
+                { draftId: draft.id, threadId: id },
+                {
+                  onSuccess: () => {
+                    setConfirming(false);
+                    setLocation('/needs-attention');
+                  },
+                  onError: (e) => {
+                    setConfirming(false);
+                    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                      setErr('Queued — will send when you’re back online.');
+                      setLocation('/needs-attention');
+                    } else {
+                      fail(e);
+                    }
+                  },
                 },
-                onSuccess: () => {
-                  send.mutate(
-                    { draftId: draft.id, threadId: id },
-                    {
-                      onSuccess: () => {
-                        setConfirming(false);
-                        setLocation('/needs-attention');
-                      },
-                      onError: (e) => {
-                        setConfirming(false);
-                        fail(e);
-                      },
-                    },
-                  );
+              );
+            };
+            if (offline) {
+              // Firefox holds an offline fetch pending (no fast failure), so we can't wait for
+              // send's onError to surface "Queued". Show it immediately and fire the send — the SW
+              // queues it (Chromium BackgroundSync) or it stays in flight until reconnect (Firefox);
+              // either way it delivers when connectivity returns. Don't navigate away, so a Firefox
+              // pending request isn't aborted.
+              setConfirming(false);
+              setErr('Queued — will send when you’re back online.');
+              send.mutate({ draftId: draft.id, threadId: id });
+            } else {
+              edit.mutate(
+                { draftId: draft.id, threadId: id, bodyText: body },
+                {
+                  onError: (e) => {
+                    setConfirming(false);
+                    fail(e);
+                  },
+                  onSuccess: doSend,
                 },
-              },
-            );
+              );
+            }
           }}
         />
       ) : null}

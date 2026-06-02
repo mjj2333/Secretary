@@ -1,4 +1,5 @@
 import { getSession, clearSession } from './session.js';
+import { markSynced } from '../util/syncStatus.js';
 
 export class ApiError extends Error {
   constructor(
@@ -39,5 +40,6 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     const e = body.error ?? { code: 'error', message: `Request failed (${res.status})` };
     throw new ApiError(e.code, e.message, res.status);
   }
+  markSynced();
   return body.data as T;
 }

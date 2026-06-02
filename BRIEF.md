@@ -1046,6 +1046,8 @@ Each phase has explicit acceptance criteria. Don't move to the next phase until 
 - With phone in airplane mode, opening the PWA shows the last-loaded state and an offline banner.
 - Re-enabling network triggers a re-sync.
 
+**Implementation note (2026-06-01):** Built A (Web Push: VAPID generated on first run → keychain, `GET /push/vapid-public-key`, `WebPushSender` on `draft:ready` → "New draft ready for <sender>" → tap opens `/threads/:id`, real `POST /push/test`), B (quiet hours, default 22:00–08:00 server-local, suppresses push only — drafts/SSE unaffected), C (offline send-queue via the SW's Workbox BackgroundSync on `POST /drafts/:id/send`; offline the UI shows "Queued"), and E (offline banner with last-synced time). **Deferred:** D — runtime API response caching (SSE already provides freshness; avoids stale-draft confusion), so "airplane mode shows last-loaded state" is limited to the precached app shell + the offline banner rather than cached API data; full offline compose; and the phone/tunnel trusted-HTTPS deployment (the push mechanism is verified on the desktop browser). The PWA service worker moved to vite-plugin-pwa `injectManifest` (`src/sw.ts`) to host precache + push + the send-queue.
+
 ### Phase 6 — Voice tuning tools (2 weeks initial)
 
 1. Style guide editor in PWA settings (markdown editor, syntax-highlighted).

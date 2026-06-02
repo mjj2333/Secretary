@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { SecretaryError, ValidationError } from '@secretary/shared-types';
 import { PushSubscriptionRepository } from '../db/repositories/PushSubscriptionRepository.js';
 
+export interface PushService {
+  readonly publicKey: string;
+  sendTest(): Promise<{ sent: number }>;
+  notifyDraftReady(threadId: string): Promise<void>;
+}
+
 const subscribeSchema = z.object({
   endpoint: z.string().url(),
   keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) }),
@@ -16,8 +22,16 @@ class PushNotConfiguredError extends SecretaryError {
   }
 }
 
-export function registerPushRoutes(app: FastifyInstance, deps: { db: Database.Database }): void {
+export function registerPushRoutes(
+  app: FastifyInstance,
+  deps: { db: Database.Database; push?: PushService | null },
+): void {
   const repo = new PushSubscriptionRepository(deps.db);
+
+  app.get('/push/vapid-public-key', async () => {
+    if (!deps.push) throw new PushNotConfiguredError();
+    return { data: { publicKey: deps.push.publicKey } };
+  });
 
   app.post('/push/subscribe', async (req) => {
     const parsed = subscribeSchema.safeParse(req.body);
@@ -33,8 +47,8 @@ export function registerPushRoutes(app: FastifyInstance, deps: { db: Database.Da
     return { data: { deleted: true } };
   });
 
-  // VAPID + actual sending arrive in Phase 5.5; until then this is a clear no-op error.
   app.post('/push/test', async () => {
-    throw new PushNotConfiguredError();
+    if (!deps.push) throw new PushNotConfiguredError();
+    return { data: await deps.push.sendTest() };
   });
 }

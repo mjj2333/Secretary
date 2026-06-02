@@ -8,8 +8,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
+      injectManifest: { globPatterns: ['**/*.{js,css,html,svg}'] },
       manifest: {
         name: 'Secretary',
         short_name: 'Secretary',
@@ -20,10 +24,7 @@ export default defineConfig({
         background_color: '#0f172a',
         icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
-      workbox: {
-        navigateFallback: '/index.html',
-        globPatterns: ['**/*.{js,css,html,svg}'],
-      },
+      devOptions: { enabled: false, type: 'module' },
     }),
   ],
   server: {
