@@ -110,3 +110,26 @@ describe('PromptAssembler.buildClassificationPrompt', () => {
     db.close();
   });
 });
+
+describe('PromptAssembler.buildMiningPrompt', () => {
+  it('buildMiningPrompt asks for JSON and includes reply + inbound context', () => {
+    const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
+    const prompts = new PromptAssembler(
+      new MessagesRepository(db),
+      new ThreadsRepository(db),
+      new ContactsRepository(db),
+      new SettingsRepository(db),
+      new StyleExamplesRepository(db),
+    );
+    const out = prompts.buildMiningPrompt({
+      subject: 'Re: Meeting',
+      sentReply: 'Tuesday at 2 works for me.',
+      inboundContext: 'Are you free Tuesday?',
+    });
+    db.close();
+    expect(out.system).toContain('JSON');
+    expect(out.system).toContain('context_summary');
+    expect(out.prompt).toContain('Tuesday at 2 works for me.');
+    expect(out.prompt).toContain('Are you free Tuesday?');
+  });
+});

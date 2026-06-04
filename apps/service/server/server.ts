@@ -22,6 +22,7 @@ import { registerAccountsRoutes } from './api/accounts.js';
 import { registerThreadsRoutes } from './api/threads.js';
 import { registerContactsRoutes } from './api/contacts.js';
 import { registerDraftsRoutes } from './api/drafts.js';
+import { registerStyleRoutes, type MiningDeps } from './api/style.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -53,6 +54,8 @@ export interface ServerDeps {
   };
   /** Web Push service. Omitted/null until VAPID keys exist → push routes 409. */
   push?: import('./api/push.js').PushService | null;
+  /** Sent-mail mining lane + progress + whether the gateway is configured. */
+  mining: MiningDeps;
 }
 
 /**
@@ -146,6 +149,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       registerThreadsRoutes(api, deps);
       registerContactsRoutes(api, deps);
       registerDraftsRoutes(api, deps);
+      registerStyleRoutes(api, deps);
     },
     { prefix: '/api/v1' },
   );

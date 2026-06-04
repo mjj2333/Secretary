@@ -23,6 +23,7 @@ import { StyleExamplesRepository } from '../../server/db/repositories/StyleExamp
 import { PromptAssembler } from '../../server/agent/PromptAssembler.js';
 import { MessagesRepository } from '../../server/db/repositories/MessagesRepository.js';
 import { FakeGateway } from './fakeGateway.js';
+import { MiningJob } from '../../server/agent/MiningJob.js';
 
 export interface TestServer {
   app: FastifyInstance;
@@ -38,6 +39,7 @@ export interface TestServer {
   classificationQueue: { enqueued: string[]; enqueue(messageId: string): void };
   stateMachine: StateMachine;
   drafter: Drafter;
+  mining: { enqueued: string[]; job: MiningJob; gatewayReady: boolean; queue: { enqueue(id: string): void; onIdle(): Promise<void> } };
 }
 
 /** Builds a fully-wired server against a temp encrypted DB and an in-memory secret store. */
@@ -47,6 +49,7 @@ export async function makeTestServer(
     pwaDir?: string;
     draftBody?: string;
     push?: import('../../server/api/push.js').PushService | null;
+    miningGatewayReady?: boolean;
   } = {},
 ): Promise<TestServer> {
   const dir = mkdtempSync(join(tmpdir(), 'secretary-srv-'));
@@ -96,6 +99,20 @@ export async function makeTestServer(
     { info() {}, warn() {} },
   );
 
+  const miningEnqueued: string[] = [];
+  const miningJob = new MiningJob();
+  const mining = {
+    enqueued: miningEnqueued,
+    job: miningJob,
+    gatewayReady: opts.miningGatewayReady ?? true,
+    queue: {
+      enqueue(id: string) {
+        miningEnqueued.push(id);
+      },
+      onIdle: () => Promise.resolve(),
+    },
+  };
+
   const app = buildServer({
     db,
     sessions,
@@ -110,6 +127,7 @@ export async function makeTestServer(
     drafter,
     ...(opts.pwaDir ? { pwaDir: opts.pwaDir } : {}),
     ...(opts.push !== undefined ? { push: opts.push } : {}),
+    mining,
   });
   await app.ready();
 
@@ -132,5 +150,6 @@ export async function makeTestServer(
     classificationQueue,
     stateMachine,
     drafter,
+    mining,
   };
 }

@@ -12,6 +12,7 @@ export interface DraftInsert {
   cc: EmailAddress[];
   subject: string | null;
   bodyText: string;
+  generatedBodyText: string;
   rawIntent: string | null;
   polishDiff: DiffOp[] | null;
   systemPromptUsed: string;
@@ -39,9 +40,9 @@ export class DraftsRepository {
       .prepare(
         `INSERT INTO drafts
           (id, thread_id, account_id, version, in_reply_to_message_id, to_addresses, cc_addresses,
-           subject, body_text, raw_intent, polish_diff, system_prompt_used, model_used,
+           subject, body_text, generated_body_text, raw_intent, polish_diff, system_prompt_used, model_used,
            tokens_in, tokens_out, latency_ms, status, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending_review', ?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending_review', ?)`,
       )
       .run(
         id,
@@ -53,6 +54,7 @@ export class DraftsRepository {
         JSON.stringify(input.cc),
         input.subject,
         input.bodyText,
+        input.generatedBodyText,
         input.rawIntent,
         input.polishDiff ? JSON.stringify(input.polishDiff) : null,
         input.systemPromptUsed,

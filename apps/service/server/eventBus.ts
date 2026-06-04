@@ -4,7 +4,8 @@ export type ServerEvent =
   | { type: 'thread:updated'; payload: unknown }
   | { type: 'draft:ready'; payload: unknown }
   | { type: 'account:status'; payload: unknown }
-  | { type: 'sync:progress'; payload: unknown };
+  | { type: 'sync:progress'; payload: unknown }
+  | { type: 'mining:progress'; payload: { done: number; total: number } };
 
 /** In-process pub/sub feeding the SSE endpoint. Domain events are emitted in later phases. */
 export class EventBus {

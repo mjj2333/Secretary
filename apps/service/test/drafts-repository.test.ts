@@ -35,6 +35,7 @@ function insertInput(threadId: string, version: number) {
     cc: [],
     subject: 'Re: hi',
     bodyText: 'Hello there.',
+    generatedBodyText: 'Hello there.',
     rawIntent: null,
     polishDiff: null,
     systemPromptUsed: 'sys',
@@ -102,6 +103,7 @@ function seedDraft(db: import('better-sqlite3-multiple-ciphers').Database, versi
     cc: [],
     subject: 'Re: hi',
     bodyText: 'body',
+    generatedBodyText: 'body',
     rawIntent: null,
     polishDiff: null,
     systemPromptUsed: 'p',
@@ -112,6 +114,75 @@ function seedDraft(db: import('better-sqlite3-multiple-ciphers').Database, versi
     createdAt: 1000 * version,
   });
 }
+
+describe('DraftsRepository generated_body_text', () => {
+  it('persists generated_body_text from the insert', () => {
+    const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('a1','imap','A','a@b.com')`,
+    ).run();
+    const threads = new ThreadsRepository(db);
+    const threadId = threads.create('a1', 'subj', ['x@y.com'], 1000);
+    const repo = new DraftsRepository(db);
+    const id = repo.insert({
+      threadId,
+      accountId: 'a1',
+      version: 1,
+      inReplyToMessageId: null,
+      to: [{ address: 'x@y.com' }],
+      cc: [],
+      subject: 'Re: subj',
+      bodyText: 'original generated body',
+      generatedBodyText: 'original generated body',
+      rawIntent: null,
+      polishDiff: null,
+      systemPromptUsed: 'sys',
+      modelUsed: 'm',
+      tokensIn: 1,
+      tokensOut: 1,
+      latencyMs: 1,
+      createdAt: 1000,
+    });
+    const row = repo.getById(id)!;
+    db.close();
+    expect(row.generated_body_text).toBe('original generated body');
+    expect(row.body_text).toBe('original generated body');
+  });
+
+  it('updateBody does not overwrite generated_body_text', () => {
+    const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('a1','imap','A','a@b.com')`,
+    ).run();
+    const threads = new ThreadsRepository(db);
+    const threadId = threads.create('a1', 'subj', ['x@y.com'], 1000);
+    const repo = new DraftsRepository(db);
+    const id = repo.insert({
+      threadId,
+      accountId: 'a1',
+      version: 1,
+      inReplyToMessageId: null,
+      to: [{ address: 'x@y.com' }],
+      cc: [],
+      subject: 'Re: subj',
+      bodyText: 'original generated body',
+      generatedBodyText: 'original generated body',
+      rawIntent: null,
+      polishDiff: null,
+      systemPromptUsed: 'sys',
+      modelUsed: 'm',
+      tokensIn: 1,
+      tokensOut: 1,
+      latencyMs: 1,
+      createdAt: 1000,
+    });
+    repo.updateBody(id, { bodyText: 'user edited body' });
+    const row = repo.getById(id)!;
+    db.close();
+    expect(row.body_text).toBe('user edited body');
+    expect(row.generated_body_text).toBe('original generated body'); // preserved across edits
+  });
+});
 
 describe('DraftsRepository.currentForThread', () => {
   it('returns the latest draft that is not sent or discarded', async () => {

@@ -3,6 +3,7 @@ import type {
   ContactView,
   DraftView,
   NeedsAttentionItem,
+  StyleExampleView,
   ThreadSummary,
   ThreadWithMessages,
 } from '@secretary/shared-types';
@@ -164,6 +165,64 @@ export function usePatchContact() {
     onSuccess: (_d, vars) => {
       void qc.invalidateQueries({ queryKey: ['contact', vars.id] });
       void qc.invalidateQueries({ queryKey: ['contacts'] });
+    },
+  });
+}
+
+export interface MiningStatus {
+  running: boolean;
+  total: number;
+  done: number;
+}
+
+export function useStyleExamples(
+  status: 'pending' | 'approved' | 'rejected' = 'pending',
+): UseQueryResult<StyleExampleView[]> {
+  return useQuery({
+    queryKey: ['style-examples', status],
+    queryFn: () => apiFetch<StyleExampleView[]>(`/style/examples?status=${status}`),
+  });
+}
+
+export function useMiningStatus(): UseQueryResult<MiningStatus> {
+  return useQuery({
+    queryKey: ['mining-status'],
+    queryFn: () => apiFetch<MiningStatus>('/style/mining-status'),
+  });
+}
+
+export function useMineSentMail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ enqueued: number; alreadyMined: number }>('/style/mine', {
+        method: 'POST',
+        body: '{}',
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['mining-status'] });
+    },
+  });
+}
+
+export function usePatchStyleExample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      status?: 'pending' | 'approved' | 'rejected';
+      contextSummary?: string;
+      replyText?: string;
+      tags?: string[];
+    }) => {
+      const { id, ...fields } = vars;
+      return apiFetch<StyleExampleView>(`/style/examples/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(fields),
+      });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['style-examples'] });
     },
   });
 }

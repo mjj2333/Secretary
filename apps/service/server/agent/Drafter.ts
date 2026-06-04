@@ -77,6 +77,7 @@ export class Drafter {
         cc: [],
         subject: replySubject(target.subject),
         bodyText: body,
+        generatedBodyText: body,
         rawIntent,
         polishDiff,
         systemPromptUsed,

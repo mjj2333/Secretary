@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'wouter';
 import { useSettings, useStyleGuide, useSaveStyleGuide } from '../api/hooks.js';
 import { enablePush, sendTestPush, type EnableResult } from '../push/subscribe.js';
 
@@ -57,6 +58,9 @@ function StyleGuideEditor(): JSX.Element {
         </button>
       </div>
       {msg ? <p className="mt-1 text-xs text-slate-600">{msg}</p> : null}
+      <Link href="/voice/examples" className="block text-sm text-sky-700 underline">
+        Review mined style examples →
+      </Link>
     </section>
   );
 }

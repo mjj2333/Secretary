@@ -24,4 +24,10 @@ describe('eventToInvalidations', () => {
       ['threads'],
     ]);
   });
+
+  it('mining:progress yields no query invalidations (handled via setQueryData)', () => {
+    expect(eventToInvalidations({ type: 'mining:progress', payload: { done: 1, total: 3 } })).toEqual(
+      [],
+    );
+  });
 });

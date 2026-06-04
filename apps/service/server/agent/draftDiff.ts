@@ -51,3 +51,30 @@ export function lineDiff(before: string, after: string): DiffOp[] {
   }
   return ops;
 }
+
+/** Cap inputs so the O(n·m) LCS stays bounded on pathological bodies. */
+const MAX_DIVERGENCE_WORDS = 2000;
+
+/**
+ * Word-level divergence in [0,1]: 0 = identical, 1 = no shared words.
+ * `1 - 2·LCS / (genWords + sentWords)` over whitespace-split words.
+ * Both-empty → 0. Used to flag heavily-edited drafts on send.
+ */
+export function divergenceRatio(generated: string, finalSent: string): number {
+  const a = generated.trim().split(/\s+/).filter(Boolean).slice(0, MAX_DIVERGENCE_WORDS);
+  const b = finalSent.trim().split(/\s+/).filter(Boolean).slice(0, MAX_DIVERGENCE_WORDS);
+  const n = a.length;
+  const m = b.length;
+  if (n === 0 && m === 0) return 0;
+  // dp[i][j] = LCS length of a[i:] and b[j:]
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i]![j] =
+        a[i] === b[j] ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
+    }
+  }
+  const lcs = dp[0]![0]!;
+  const ratio = 1 - (2 * lcs) / (n + m);
+  return Math.min(1, Math.max(0, ratio));
+}

@@ -88,4 +88,17 @@ export class MessagesRepository {
       )
       .get(threadId) as MessageRow | undefined;
   }
+
+  /** The most recent genuinely-sent outbound messages (newest first), for style mining. */
+  recentOutbound(limit: number): MessageRow[] {
+    return this.db
+      .prepare(
+        `SELECT * FROM messages
+         WHERE direction = 'outbound' AND (is_draft IS NULL OR is_draft = 0)
+           AND body_text IS NOT NULL AND TRIM(body_text) != ''
+         ORDER BY COALESCE(date_sent, date_received, 0) DESC
+         LIMIT ?`,
+      )
+      .all(limit) as MessageRow[];
+  }
 }

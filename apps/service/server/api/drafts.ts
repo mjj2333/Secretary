@@ -13,6 +13,9 @@ import { MessagesRepository } from '../db/repositories/MessagesRepository.js';
 import type { DraftRow } from '../db/schema.js';
 import type { ProviderRegistry } from '../providers/ProviderRegistry.js';
 import { draftView, parseAddrs } from './views.js';
+import { divergenceRatio } from '../agent/draftDiff.js';
+
+const HEAVY_EDIT_THRESHOLD = 0.3;
 
 const createSchema = z
   .object({
@@ -103,6 +106,22 @@ export function registerDraftsRoutes(app: FastifyInstance, deps: DraftsRouteDeps
       );
     }
     drafts.markSent(id, { sentAt: Date.now(), finalBodySent: input.bodyText });
+    if (draft.generated_body_text !== null) {
+      const div = divergenceRatio(draft.generated_body_text, input.bodyText);
+      if (div >= HEAVY_EDIT_THRESHOLD) {
+        actions.append({
+          actor: 'user',
+          action: 'draft_heavily_edited',
+          targetType: 'draft',
+          targetId: id,
+          details: {
+            threadId: draft.thread_id,
+            version: draft.version,
+            divergencePct: Math.round(div * 100),
+          },
+        });
+      }
+    }
     deps.stateMachine.onOutbound(draft.thread_id);
     actions.append({
       actor: 'user',

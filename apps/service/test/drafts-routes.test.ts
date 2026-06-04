@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { makeTestServer, type TestServer } from './helpers/testServer.js';
+import { ThreadsRepository } from '../server/db/repositories/ThreadsRepository.js';
+import { MessagesRepository } from '../server/db/repositories/MessagesRepository.js';
+import { ContactsRepository } from '../server/db/repositories/ContactsRepository.js';
+import type { RawMessage } from '@secretary/shared-types';
 
 describe('drafts routes', () => {
   function insertThreadWithInbound(db: TestServer['db']) {
@@ -185,5 +189,138 @@ describe('drafts routes', () => {
     });
     expect(res.statusCode).toBe(404);
     await app.close();
+  });
+});
+
+function inbound(when: number): RawMessage {
+  return {
+    providerId: 'in1',
+    references: [],
+    messageIdHeader: '<in1@x>',
+    from: { address: 'alice@x.com', name: 'Alice' },
+    to: [{ address: 'me@b.com' }],
+    cc: [],
+    bcc: [],
+    subject: 'Question',
+    bodyText: 'Are you free Tuesday?',
+    snippet: 'Are you free Tuesday?',
+    direction: 'inbound',
+    dateReceived: when,
+    isRead: false,
+    isStarred: false,
+    folder: 'INBOX',
+    labels: [],
+    attachmentsMeta: [],
+  };
+}
+
+async function seedDraft(opts: { draftBody: string }) {
+  const t = await makeTestServer({ draftBody: opts.draftBody });
+  const add = await t.app.inject({
+    method: 'POST',
+    url: '/api/v1/accounts/imap',
+    headers: { authorization: `Bearer ${t.session}` },
+    payload: {
+      displayName: 'Me',
+      emailAddress: 'me@b.com',
+      imapHost: 'imap.example.com',
+      imapPort: 993,
+      useTls: true,
+      smtpHost: 'smtp.example.com',
+      smtpPort: 465,
+      password: 'secret',
+    },
+  });
+  const accountId = add.json().data.id as string;
+  const threads = new ThreadsRepository(t.db);
+  const messages = new MessagesRepository(t.db);
+  const contacts = new ContactsRepository(t.db);
+  const threadId = threads.create(accountId, 'question', ['alice@x.com'], 1000);
+  contacts.recordSeen({ address: 'alice@x.com', name: 'Alice' }, 'inbound', 1000);
+  messages.insert(accountId, threadId, inbound(1000));
+  const draftRes = await t.app.inject({
+    method: 'POST',
+    url: '/api/v1/drafts',
+    headers: { authorization: `Bearer ${t.session}` },
+    payload: { threadId },
+  });
+  const draftId = draftRes.json().data.id as string;
+  return { t, threadId, draftId };
+}
+
+function heavyEditCount(db: import('better-sqlite3-multiple-ciphers').Database): number {
+  return (
+    db
+      .prepare("SELECT COUNT(*) AS n FROM action_log WHERE action='draft_heavily_edited'")
+      .get() as { n: number }
+  ).n;
+}
+
+describe('send route — heavy-edit detection', () => {
+  it('logs draft_heavily_edited (ids + ratio, no body) on a large rewrite', async () => {
+    const { t, draftId } = await seedDraft({ draftBody: 'Generated original body here.' });
+    await t.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/drafts/${draftId}`,
+      headers: { authorization: `Bearer ${t.session}` },
+      payload: { bodyText: 'Totally different rewritten content replacing everything now today.' },
+    });
+    const send = await t.app.inject({
+      method: 'POST',
+      url: `/api/v1/drafts/${draftId}/send`,
+      headers: { authorization: `Bearer ${t.session}` },
+      payload: {},
+    });
+    expect(send.statusCode).toBe(200);
+    const row = t.db
+      .prepare("SELECT details FROM action_log WHERE action='draft_heavily_edited'")
+      .get() as { details: string } | undefined;
+    await t.app.close();
+    expect(row).toBeDefined();
+    const details = JSON.parse(row!.details) as Record<string, unknown>;
+    expect(typeof details.divergencePct).toBe('number');
+    expect(JSON.stringify(details)).not.toContain('Totally different');
+  });
+
+  it('does not log heavy-edit (and does not crash) when generated_body_text is NULL', async () => {
+    const { t, draftId } = await seedDraft({ draftBody: 'Generated original body here.' });
+    t.db.prepare('UPDATE drafts SET generated_body_text = NULL WHERE id = ?').run(draftId);
+    await t.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/drafts/${draftId}`,
+      headers: { authorization: `Bearer ${t.session}` },
+      payload: { bodyText: 'Totally different rewritten content replacing everything now today.' },
+    });
+    const send = await t.app.inject({
+      method: 'POST',
+      url: `/api/v1/drafts/${draftId}/send`,
+      headers: { authorization: `Bearer ${t.session}` },
+      payload: {},
+    });
+    const n = heavyEditCount(t.db);
+    await t.app.close();
+    expect(send.statusCode).toBe(200);
+    expect(n).toBe(0);
+  });
+
+  it('does not log when the sent body barely changed', async () => {
+    const { t, draftId } = await seedDraft({
+      draftBody: 'I will be available on Tuesday afternoon for the meeting.',
+    });
+    await t.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/drafts/${draftId}`,
+      headers: { authorization: `Bearer ${t.session}` },
+      payload: { bodyText: 'I will be available on Tuesday morning for the meeting.' },
+    });
+    await t.app.inject({
+      method: 'POST',
+      url: `/api/v1/drafts/${draftId}/send`,
+      headers: { authorization: `Bearer ${t.session}` },
+      payload: {},
+    });
+    const n = heavyEditCount(t.db);
+    await t.app.close();
+    expect(n).toBe(0);
   });
 });

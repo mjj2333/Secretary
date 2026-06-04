@@ -30,6 +30,8 @@ import { Classifier } from './agent/Classifier.js';
 import { Drafter } from './agent/Drafter.js';
 import { SequentialQueue } from './agent/SequentialQueue.js';
 import { FollowUpEngine } from './agent/FollowUpEngine.js';
+import { SentMailMiner } from './agent/SentMailMiner.js';
+import { MiningJob } from './agent/MiningJob.js';
 import { DraftsRepository } from './db/repositories/DraftsRepository.js';
 import { ensureVapidKeys, configureWebPush } from './push/vapid.js';
 import { WebPushSender } from './push/WebPushSender.js';
@@ -134,6 +136,21 @@ async function main(): Promise<void> {
     (threadId) => draftQueue.enqueue(threadId),
   );
   const classificationQueue = new SequentialQueue((id) => classifier.classify(id));
+
+  const miningJob = new MiningJob();
+  const miner = new SentMailMiner(
+    promptAssembler,
+    gateway,
+    messagesRepo,
+    contactsRepo,
+    styleExamplesRepo,
+    miningJob,
+    eventBus,
+    log,
+    settingsRepo,
+  );
+  const miningQueue = new SequentialQueue((id) => miner.mine(id));
+
   const followUpEngine = new FollowUpEngine(db, threadsRepo, followUpsRepo, actionsRepo, eventBus);
 
   const providers = new ProviderRegistry();
@@ -190,6 +207,7 @@ async function main(): Promise<void> {
     stateMachine,
     drafter,
     push,
+    mining: { queue: miningQueue, job: miningJob, gatewayReady: gateway !== null },
   });
 
   await app.listen({ port: config.port, host: config.host });

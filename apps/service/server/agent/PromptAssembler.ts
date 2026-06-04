@@ -169,6 +169,31 @@ export class PromptAssembler {
 
     return { system, prompt: lines.join('\n'), systemPromptUsed: system };
   }
+
+  buildMiningPrompt(input: {
+    subject: string | null;
+    sentReply: string;
+    inboundContext: string | null;
+  }): { system: string; prompt: string } {
+    const system = [
+      'You analyze one email reply the user sent, to capture their writing style.',
+      'Output ONLY a JSON object: {"context_summary": string, "tags": string[]}.',
+      'context_summary: 1-2 sentences describing the situation being responded to.',
+      'tags: short style descriptors (e.g. "warm", "concise", "no-signoff").',
+      'Do not output any prose outside the JSON.',
+    ].join('\n');
+
+    const lines: string[] = [];
+    if (input.subject) lines.push(`Subject: ${truncate(input.subject, SNIPPET_MAX)}`);
+    if (input.inboundContext) {
+      lines.push('## They wrote (context)');
+      lines.push(truncate(input.inboundContext, SNIPPET_MAX));
+      lines.push('');
+    }
+    lines.push('## The user replied');
+    lines.push(truncate(input.sentReply, BODY_MAX));
+    return { system, prompt: lines.join('\n') };
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import { Contacts } from './routes/Contacts.js';
 import { Settings } from './routes/Settings.js';
 import { ThreadView } from './routes/ThreadView.js';
 import { ContactDetail } from './routes/ContactDetail.js';
+import { StyleExamples } from './routes/StyleExamples.js';
 
 function Routes(): JSX.Element {
   useServerEvents();
@@ -22,6 +23,7 @@ function Routes(): JSX.Element {
         <Route path="/contacts/:id">{(p) => <ContactDetail id={p.id ?? ''} />}</Route>
         <Route path="/settings" component={Settings} />
         <Route path="/threads/:id">{(p) => <ThreadView id={p.id ?? ''} />}</Route>
+        <Route path="/voice/examples" component={StyleExamples} />
         <Route>
           <Redirect to="/needs-attention" />
         </Route>

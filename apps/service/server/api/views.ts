@@ -1,5 +1,5 @@
-import type { DiffOp, DraftView, EmailAddress } from '@secretary/shared-types';
-import type { DraftRow, ThreadRow } from '../db/schema.js';
+import type { ContactCategory, DiffOp, DraftView, EmailAddress, StyleExampleView } from '@secretary/shared-types';
+import type { DraftRow, StyleExampleRow, ThreadRow } from '../db/schema.js';
 import type { MessagesRepository } from '../db/repositories/MessagesRepository.js';
 import type { ContactsRepository } from '../db/repositories/ContactsRepository.js';
 
@@ -28,6 +28,41 @@ export function draftView(row: DraftRow): DraftView {
     modelUsed: row.model_used,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     sentAt: row.sent_at ? new Date(row.sent_at).toISOString() : null,
+  };
+}
+
+const CONTACT_CATEGORIES: ReadonlySet<string> = new Set([
+  'client_established',
+  'client_new',
+  'screening',
+  'personal',
+  'vendor',
+  'noise',
+  'unknown',
+]);
+
+export function styleExampleView(row: StyleExampleRow): StyleExampleView {
+  let tags: string[] = [];
+  if (row.tags) {
+    try {
+      const parsed = JSON.parse(row.tags) as unknown;
+      if (Array.isArray(parsed)) tags = parsed.filter((t): t is string => typeof t === 'string');
+    } catch {
+      tags = [];
+    }
+  }
+  const category =
+    row.contact_category && CONTACT_CATEGORIES.has(row.contact_category)
+      ? (row.contact_category as ContactCategory)
+      : null;
+  return {
+    id: row.id,
+    sourceMessageId: row.source_message_id,
+    category,
+    contextSummary: row.context_summary ?? '',
+    replyText: row.reply_text ?? '',
+    tags,
+    status: row.status,
   };
 }
 

@@ -157,6 +157,19 @@ export interface NeedsAttentionItem extends ThreadSummary {
   hasPendingFollowUp: boolean;
 }
 
+// Keep in sync with StyleExampleStatus in apps/service/server/db/schema.ts (DB layer) and the style_examples.status CHECK constraint.
+export type StyleExampleStatus = 'pending' | 'approved' | 'rejected';
+
+export interface StyleExampleView {
+  id: string;
+  sourceMessageId: string | null;
+  category: ContactCategory | null;
+  contextSummary: string;
+  replyText: string;
+  tags: string[];
+  status: StyleExampleStatus;
+}
+
 /** Contact as returned by the contacts API (ISO dates per §16). */
 export interface ContactView {
   id: string;

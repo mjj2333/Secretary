@@ -36,6 +36,26 @@ function raw(uid: string, direction: MessageDirection, when: number): RawMessage
   };
 }
 
+function msg(overrides: Partial<RawMessage> & { providerId: string; direction: 'inbound' | 'outbound' }): RawMessage {
+  return {
+    references: [],
+    messageIdHeader: `<${overrides.providerId}@x>`,
+    from: { address: 'me@b.com' },
+    to: [{ address: 'x@y.com' }],
+    cc: [],
+    bcc: [],
+    subject: 's',
+    bodyText: 'body',
+    snippet: 'body',
+    isRead: true,
+    isStarred: false,
+    folder: 'Sent',
+    labels: [],
+    attachmentsMeta: [],
+    ...overrides,
+  };
+}
+
 describe('MessagesRepository', () => {
   it('insert returns the new id and is idempotent on (account_id, provider_id)', () => {
     const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
@@ -87,5 +107,25 @@ describe('MessagesRepository', () => {
     expect(repo.latestForThread(threadId)?.id).toBe(outId); // newest overall
     expect(repo.latestInboundForThread(threadId)?.id).toBe(inId); // newest inbound
     db.close();
+  });
+
+  it('recentOutbound returns non-empty outbound messages, newest first, within limit; excludes drafts', () => {
+    const db = openDatabase(join(dir, 'secretary.db'), new InMemorySecretStore());
+    db.prepare(
+      `INSERT INTO accounts (id, provider, display_name, email_address) VALUES ('a1','imap','A','me@b.com')`,
+    ).run();
+    const threads = new ThreadsRepository(db);
+    const messages = new MessagesRepository(db);
+    const threadId = threads.create('a1', 's', ['x@y.com'], 1000);
+    messages.insert('a1', threadId, msg({ providerId: 'in1', direction: 'inbound', dateReceived: 1000 }));
+    messages.insert('a1', threadId, msg({ providerId: 'out-old', direction: 'outbound', dateSent: 2000 }));
+    messages.insert('a1', threadId, msg({ providerId: 'out-new', direction: 'outbound', dateSent: 3000 }));
+    messages.insert('a1', threadId, msg({ providerId: 'out-empty', direction: 'outbound', dateSent: 4000, bodyText: '   ' }));
+    const out = messages.recentOutbound(10).map((m) => m.provider_id);
+    db.prepare("UPDATE messages SET is_draft = 1 WHERE provider_id = 'out-old'").run();
+    const afterDraftFlag = messages.recentOutbound(10).map((m) => m.provider_id);
+    db.close();
+    expect(out).toEqual(['out-new', 'out-old']); // newest first; inbound + empty excluded
+    expect(afterDraftFlag).toEqual(['out-new']); // is_draft excluded
   });
 });

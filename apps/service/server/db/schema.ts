@@ -145,6 +145,7 @@ export interface DraftRow {
   cc_addresses: string | null;
   subject: string | null;
   body_text: string;
+  generated_body_text: string | null;
   body_html: string | null;
   raw_intent: string | null;
   polish_diff: string | null;
@@ -159,6 +160,9 @@ export interface DraftRow {
   final_body_sent: string | null;
 }
 
+// Keep in sync with StyleExampleStatus in packages/shared-types/src/domain.ts and the style_examples.status CHECK constraint (migration 0002).
+export type StyleExampleStatus = 'pending' | 'approved' | 'rejected';
+
 export interface StyleExampleRow {
   id: string;
   source_message_id: string | null;
@@ -167,4 +171,5 @@ export interface StyleExampleRow {
   reply_text: string | null;
   tags: string | null;
   embedding: Buffer | null;
+  status: StyleExampleStatus;
 }

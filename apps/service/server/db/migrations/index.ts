@@ -10,4 +10,4 @@ function load(version: number, name: string): Migration {
   return { version, name, sql: readFileSync(join(here, file), 'utf8') };
 }
 
-export const migrations: Migration[] = [load(1, 'init')];
+export const migrations: Migration[] = [load(1, 'init'), load(2, 'phase_6b')];

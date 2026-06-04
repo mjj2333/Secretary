@@ -1,5 +1,5 @@
 export interface ServerEvent {
-  type: 'thread:updated' | 'draft:ready' | 'account:status' | 'sync:progress';
+  type: 'thread:updated' | 'draft:ready' | 'account:status' | 'sync:progress' | 'mining:progress';
   payload: { threadId?: string; draftId?: string; accountId?: string } & Record<string, unknown>;
 }
 
@@ -38,6 +38,7 @@ export function createEventStream(
     'draft:ready',
     'account:status',
     'sync:progress',
+    'mining:progress',
   ];
 
   const connect = (): void => {
